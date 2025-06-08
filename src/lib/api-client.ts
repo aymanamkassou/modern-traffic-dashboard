@@ -33,7 +33,14 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`API Error:`, {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        errorText
+      });
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
     }
 
     return await response.json();
@@ -79,6 +86,23 @@ export const queryKeys = {
     list: (params: any) => [...queryKeys.alerts.lists(), params] as const,
     stats: () => [...queryKeys.alerts.all, 'stats'] as const,
     count: (params: any) => [...queryKeys.alerts.all, 'count', params] as const,
+  },
+  risk: {
+    all: ['risk'] as const,
+    analysis: () => [...queryKeys.risk.all, 'analysis'] as const,
+    heatmap: () => [...queryKeys.risk.all, 'heatmap'] as const,
+  },
+  historical: {
+    all: ['historical'] as const,
+    traffic: (params: any) => [...queryKeys.historical.all, 'traffic', params] as const,
+    weather: () => [...queryKeys.historical.all, 'weather'] as const,
+    congestion: () => [...queryKeys.historical.all, 'congestion'] as const,
+    incidents: () => [...queryKeys.historical.all, 'incidents'] as const,
+  },
+  coordination: {
+    all: ['coordination'] as const,
+    intersections: () => [...queryKeys.coordination.all, 'intersections'] as const,
+    stream: () => [...queryKeys.coordination.all, 'stream'] as const,
   },
 };
 
@@ -271,6 +295,91 @@ export function useTrafficStream(intersectionId?: string) {
       return apiRequest<StreamEvent>(`/api/traffic/stream${params}`);
     },
     refetchInterval: 5000, // Poll every 5 seconds
+    enabled: false, // Start disabled, enable when needed
+  });
+}
+
+// Risk Analysis Hooks
+export function useRiskAnalysis() {
+  return useQuery({
+    queryKey: queryKeys.risk.analysis(),
+    queryFn: () => apiRequest('/api/risk/analysis'),
+    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000,
+  });
+}
+
+export function useRiskHeatmap() {
+  return useQuery({
+    queryKey: queryKeys.risk.heatmap(),
+    queryFn: () => apiRequest('/api/risk/heatmap'),
+    refetchInterval: 120000, // Refresh every 2 minutes
+    staleTime: 60000,
+  });
+}
+
+// Historical Data Hooks
+export function useHistoricalTraffic(params: { aggregation?: string; start?: string; end?: string } = {}) {
+  return useQuery({
+    queryKey: queryKeys.historical.traffic(params),
+    queryFn: () => {
+      const queryString = new URLSearchParams(
+        Object.entries(params).reduce((acc, [key, value]) => {
+          if (value !== undefined && value !== null) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {} as Record<string, string>)
+      ).toString();
+      return apiRequest(`/api/historical/traffic?${queryString}`);
+    },
+    refetchInterval: 300000, // Refresh every 5 minutes
+    staleTime: 120000,
+  });
+}
+
+export function useHistoricalWeather() {
+  return useQuery({
+    queryKey: queryKeys.historical.weather(),
+    queryFn: () => apiRequest('/api/historical/weather'),
+    refetchInterval: 600000, // Refresh every 10 minutes
+    staleTime: 300000,
+  });
+}
+
+export function useHistoricalCongestion() {
+  return useQuery({
+    queryKey: queryKeys.historical.congestion(),
+    queryFn: () => apiRequest('/api/historical/congestion'),
+    refetchInterval: 300000,
+    staleTime: 120000,
+  });
+}
+
+export function useHistoricalIncidents() {
+  return useQuery({
+    queryKey: queryKeys.historical.incidents(),
+    queryFn: () => apiRequest('/api/historical/incidents'),
+    refetchInterval: 300000,
+    staleTime: 120000,
+  });
+}
+
+// Coordination Hooks
+export function useCoordinationIntersections() {
+  return useQuery({
+    queryKey: queryKeys.coordination.intersections(),
+    queryFn: () => apiRequest('/api/coordination/intersections'),
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+}
+
+export function useCoordinationStream() {
+  return useQuery({
+    queryKey: queryKeys.coordination.stream(),
+    queryFn: () => apiRequest('/api/coordination/stream'),
+    refetchInterval: 5000, // Very frequent for real-time coordination
     enabled: false, // Start disabled, enable when needed
   });
 }
