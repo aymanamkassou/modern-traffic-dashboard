@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { sseManager } from '@/lib/sse-connection-manager';
 
 export interface SSEEvent {
   type: string;
@@ -31,7 +32,6 @@ export function useServerSentEvents(
   const {
     maxEvents = 100,
     autoConnect = false,
-    retryInterval = 5000,
     onConnect,
     onDisconnect,
     onError,
@@ -45,8 +45,9 @@ export function useServerSentEvents(
     connectionCount: 0
   });
 
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const subscriberIdRef = useRef<string>(`sse-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(true);
   
   // Use refs to store callbacks to avoid recreating connect function when they change
   const callbacksRef = useRef({
@@ -67,150 +68,123 @@ export function useServerSentEvents(
   }, [onConnect, onDisconnect, onError, onEvent]);
 
   const disconnect = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
     }
     
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
+    if (isMountedRef.current) {
+      setState(prev => ({ 
+        ...prev, 
+        isConnected: false,
+        error: null
+      }));
     }
-    
-    setState(prev => ({ 
-      ...prev, 
-      isConnected: false,
-      error: null
-    }));
-    
-    callbacksRef.current.onDisconnect?.();
   }, []);
 
   const connect = useCallback(() => {
-    if (!url) return;
-    
-    // Disconnect inline to avoid circular dependency
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    // Prevent SSR issues
+    if (typeof window === 'undefined' || !url) {
+      return;
     }
     
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
+    // Disconnect existing connection
+    disconnect();
+
+    console.log(`🔌 SSE Hook: Connecting to ${url}`, { subscriberId: subscriberIdRef.current });
 
     try {
-      const eventSource = new EventSource(url);
-      eventSourceRef.current = eventSource;
-
-      eventSource.onopen = () => {
-        setState(prev => ({
-          ...prev,
-          isConnected: true,
-          error: null,
-          connectionCount: prev.connectionCount + 1
-        }));
-        callbacksRef.current.onConnect?.();
-      };
-
-      eventSource.onmessage = (event) => {
-        try {
-          const parsedData = JSON.parse(event.data);
-          const sseEvent: SSEEvent = {
-            type: parsedData.type || 'message',
-            data: parsedData.data || parsedData,
-            timestamp: parsedData.timestamp || new Date().toISOString(),
-            id: event.lastEventId || undefined
-          };
-
-          setState(prev => ({
-            ...prev,
-            events: [...prev.events.slice(-(maxEvents - 1)), sseEvent]
-          }));
-
-          callbacksRef.current.onEvent?.(sseEvent);
-        } catch (parseError) {
-          console.error('Failed to parse SSE event:', parseError);
-          const errorEvent: SSEEvent = {
-            type: 'parse_error',
-            data: { originalData: event.data, error: parseError },
-            timestamp: new Date().toISOString()
-          };
-          
-          setState(prev => ({
-            ...prev,
-            events: [...prev.events.slice(-(maxEvents - 1)), errorEvent]
-          }));
+      const unsubscribe = sseManager.subscribe(url, {
+        id: subscriberIdRef.current,
+        onConnect: () => {
+          if (isMountedRef.current) {
+            setState(prev => ({
+              ...prev,
+              isConnected: true,
+              error: null,
+              connectionCount: prev.connectionCount + 1
+            }));
+            callbacksRef.current.onConnect?.();
+          }
+        },
+        onDisconnect: () => {
+          if (isMountedRef.current) {
+            setState(prev => ({ 
+              ...prev, 
+              isConnected: false 
+            }));
+            callbacksRef.current.onDisconnect?.();
+          }
+        },
+        onError: (error) => {
+          if (isMountedRef.current) {
+            setState(prev => ({
+              ...prev,
+              isConnected: false,
+              error: error.message
+            }));
+            callbacksRef.current.onError?.(error);
+          }
+        },
+        onEvent: (event) => {
+          if (isMountedRef.current) {
+            setState(prev => ({
+              ...prev,
+              events: [...prev.events.slice(-(maxEvents - 1)), event]
+            }));
+            callbacksRef.current.onEvent?.(event);
+          }
         }
-      };
+      });
 
-      eventSource.onerror = (error) => {
-        const errorMsg = 'EventSource connection failed';
-        setState(prev => ({
-          ...prev,
-          isConnected: false,
-          error: errorMsg
-        }));
-
-        callbacksRef.current.onError?.(new Error(errorMsg));
-
-        // Auto-retry connection
-        if (retryInterval > 0) {
-          retryTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, retryInterval);
-        }
-      };
+      unsubscribeRef.current = unsubscribe;
 
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to create EventSource';
-      setState(prev => ({
-        ...prev,
-        error: errorMsg
-      }));
-      callbacksRef.current.onError?.(new Error(errorMsg));
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create SSE connection';
+      if (isMountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          error: errorMsg,
+          isConnected: false
+        }));
+        callbacksRef.current.onError?.(new Error(errorMsg));
+      }
     }
-  }, [url, maxEvents, retryInterval]);
+  }, [url, maxEvents, disconnect]);
 
   const clearEvents = useCallback(() => {
-    setState(prev => ({ ...prev, events: [] }));
+    if (isMountedRef.current) {
+      setState(prev => ({ ...prev, events: [] }));
+    }
   }, []);
 
   const clearError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null }));
+    if (isMountedRef.current) {
+      setState(prev => ({ ...prev, error: null }));
+    }
   }, []);
 
-  // Auto-connect effect
+  // Auto-connect effect - only run on client side
   useEffect(() => {
-    if (autoConnect && url) {
-      connect();
-    }
-    
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+    if (typeof window !== 'undefined' && autoConnect && url) {
+      // Small delay to prevent SSR hydration issues
+      const timer = setTimeout(() => {
+        connect();
+      }, 100);
       
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
-    };
+      return () => clearTimeout(timer);
+    }
   }, [autoConnect, url, connect]);
 
   // Cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+    
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
+      isMountedRef.current = false;
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
     };
   }, []);

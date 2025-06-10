@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from '@/components/ui/sonner'
+import { NotificationProvider } from '@/contexts/notification-context'
 
 // Create a React Query client with optimized configuration
 const queryClient = new QueryClient({
@@ -39,14 +40,16 @@ export function Providers({ children }: ProvidersProps) {
         enableSystem
         disableTransitionOnChange
       >
-        {children}
-        <Toaster 
-          position="bottom-right"
-          toastOptions={{
-            duration: 4000,
-          }}
-        />
-        <ReactQueryDevtools initialIsOpen={false} />
+        <NotificationProvider>
+          {children}
+          <Toaster 
+            position="bottom-right"
+            toastOptions={{
+              duration: 4000,
+            }}
+          />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </NotificationProvider>
       </ThemeProvider>
     </QueryClientProvider>
   )

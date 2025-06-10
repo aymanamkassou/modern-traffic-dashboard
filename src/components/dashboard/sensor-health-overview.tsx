@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useServerSentEvents } from "@/hooks/use-server-sent-events"
 import { 
-  isSensorData, 
   isConnectionMessage,
   type SensorStreamData,
-  type SSEEvent
+  type SSEEvent,
+  type StreamData
 } from "@/types/sse-events"
 import { Cpu, Thermometer, Battery, Clock } from "lucide-react"
 
@@ -43,6 +43,17 @@ export function SensorHealthOverview() {
   const [recentSensorUpdates, setRecentSensorUpdates] = useState<SensorStreamData[]>([])
   const [lastUpdate, setLastUpdate] = useState<string>('')
 
+  // Helper function to check if data is SensorStreamData
+  const isSensorStreamData = (data: StreamData): data is SensorStreamData => {
+    return data && 
+           typeof data === 'object' && 
+           'stream_type' in data && 
+           data.stream_type === 'SENSOR' && 
+           'sensor_id' in data && 
+           'battery_level' in data &&
+           'timestamp' in data
+  }
+
   // SSE connection for real-time updates
   const { isConnected, error: sseError } = useServerSentEvents(
     'http://localhost:3001/api/sensors/stream',
@@ -51,68 +62,76 @@ export function SensorHealthOverview() {
       maxEvents: 50,
       retryInterval: 3000,
       onEvent: (event: SSEEvent) => {
-        // Skip connection messages
-        if (isConnectionMessage(event.data)) {
-          return
-        }
-        
-        // Handle sensor data
-        if (event.type === 'message' && isSensorData(event.data)) {
-          const sensorData = event.data
+        try {
+          // Skip connection messages
+          if (isConnectionMessage(event.data)) {
+            console.log('Sensor stream connected:', event.data.message)
+            return
+          }
           
-          // Add to recent updates (keep last 20)
-          setRecentSensorUpdates(prev => [sensorData, ...prev.slice(0, 19)])
-          
-          // Update aggregated health data
-          setSensorHealthData(prev => {
-            const newData = { ...prev }
+          // Handle sensor data - check if it's the correct sensor stream data
+          if (event.type === 'message' && isSensorStreamData(event.data)) {
+            const sensorData = event.data
+            console.log('Received sensor data:', sensorData)
             
-            // Update timestamp
-            newData.last_updated = sensorData.timestamp
+            // Add to recent updates (keep last 20)
+            setRecentSensorUpdates(prev => [sensorData, ...prev.slice(0, 19)])
             
-            // Recalculate averages from recent sensor updates
-            const allSensors = [sensorData, ...recentSensorUpdates.slice(0, 19)]
+            // Update aggregated health data
+            setSensorHealthData(prev => {
+              const newData = { ...prev }
+              
+              // Update timestamp
+              newData.last_updated = sensorData.timestamp
+              
+              // Recalculate averages from recent sensor updates
+              const allSensors = [sensorData, ...recentSensorUpdates.slice(0, 19)]
+              
+              if (allSensors.length > 0) {
+                newData.average_battery = Math.round(
+                  allSensors.reduce((sum, s) => sum + s.battery_level, 0) / allSensors.length
+                )
+                
+                newData.average_temperature = Math.round(
+                  (allSensors.reduce((sum, s) => sum + s.temperature_c, 0) / allSensors.length) * 10
+                ) / 10
+                
+                // Calculate sensor health status
+                const healthyCount = allSensors.filter(s => 
+                  s.battery_level > 70 && !s.hw_fault && !s.low_voltage
+                ).length
+                
+                const warningCount = allSensors.filter(s => 
+                  (s.battery_level <= 70 && s.battery_level > 30) || s.low_voltage
+                ).length
+                
+                const criticalCount = allSensors.filter(s => 
+                  s.battery_level <= 30 || s.hw_fault
+                ).length
+                
+                newData.healthy_sensors = healthyCount
+                newData.warning_sensors = warningCount
+                newData.critical_sensors = criticalCount
+                newData.total_sensors = allSensors.length
+                
+                // Count recent faults
+                newData.recent_faults = allSensors.filter(s => s.hw_fault || s.low_voltage).length
+                
+                // Average uptime in hours
+                newData.uptime_hours = Math.round(
+                  (allSensors.reduce((sum, s) => sum + s.uptime_s, 0) / allSensors.length) / 3600 * 10
+                ) / 10
+              }
+              
+              return newData
+            })
             
-            if (allSensors.length > 0) {
-              newData.average_battery = Math.round(
-                allSensors.reduce((sum, s) => sum + s.battery_level, 0) / allSensors.length
-              )
-              
-              newData.average_temperature = Math.round(
-                (allSensors.reduce((sum, s) => sum + s.temperature_c, 0) / allSensors.length) * 10
-              ) / 10
-              
-              // Calculate sensor health status
-              const healthyCount = allSensors.filter(s => 
-                s.battery_level > 70 && !s.hw_fault && !s.low_voltage
-              ).length
-              
-              const warningCount = allSensors.filter(s => 
-                (s.battery_level <= 70 && s.battery_level > 30) || s.low_voltage
-              ).length
-              
-              const criticalCount = allSensors.filter(s => 
-                s.battery_level <= 30 || s.hw_fault
-              ).length
-              
-              newData.healthy_sensors = healthyCount
-              newData.warning_sensors = warningCount
-              newData.critical_sensors = criticalCount
-              newData.total_sensors = allSensors.length
-              
-              // Count recent faults
-              newData.recent_faults = allSensors.filter(s => s.hw_fault || s.low_voltage).length
-              
-              // Average uptime in hours
-              newData.uptime_hours = Math.round(
-                (allSensors.reduce((sum, s) => sum + s.uptime_s, 0) / allSensors.length) / 3600 * 10
-              ) / 10
-            }
-            
-            return newData
-          })
-          
-          setLastUpdate(sensorData.timestamp)
+            setLastUpdate(sensorData.timestamp)
+          } else {
+            console.log('Received non-sensor event:', event.type, event.data)
+          }
+        } catch (err) {
+          console.error('Error processing sensor health event:', err)
         }
       }
     }
@@ -202,6 +221,22 @@ export function SensorHealthOverview() {
           </div>
           <span className="text-sm font-medium">{sensorHealthData.uptime_hours}h</span>
         </div>
+
+        {/* Connection Status */}
+        {sensorHealthData.total_sensors === 0 && (
+          <div className="text-center py-4 text-muted-foreground">
+            <Cpu className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No sensor data available</p>
+            <p className="text-xs">
+              {isConnected ? 'Waiting for sensor updates...' : 'Connecting to sensor stream...'}
+            </p>
+            {sseError && (
+              <p className="text-xs text-red-500 mt-1">
+                Error: {sseError}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Last Update */}
         {lastUpdate && (

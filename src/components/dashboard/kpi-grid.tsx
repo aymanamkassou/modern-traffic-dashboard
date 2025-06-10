@@ -27,12 +27,12 @@ import { cn } from '@/lib/utils'
 import { 
   isVehicleData, 
   isTrafficData, 
-  isAlertData, 
   isConnectionMessage,
   type VehicleStreamData,
   type TrafficStreamData,
   type AlertStreamData,
-  type SSEEvent
+  type SSEEvent,
+  type StreamData
 } from "@/types/sse-events"
 
 // Connection Status Indicator Component
@@ -396,6 +396,21 @@ function LiveAlertCountCard() {
   const [recentAlerts, setRecentAlerts] = useState<AlertStreamData[]>([])
   const [lastUpdate, setLastUpdate] = useState<string>('')
   
+  // Helper function to check if data is AlertStreamData
+  const isAlertStreamData = (data: StreamData): data is AlertStreamData => {
+    return data && 
+           typeof data === 'object' && 
+           'sensor_id' in data && 
+           'type' in data &&
+           'timestamp' in data &&
+           // Check for common alert types
+           (data.type === 'traffic-queue' || 
+            data.type === 'congestion' || 
+            data.type === 'accident' || 
+            data.type === 'sensor_fault' ||
+            typeof data.type === 'string')
+  }
+  
   // SSE connection for real-time alert updates
   const { isConnected } = useServerSentEvents(
     'http://localhost:3001/api/alerts/stream',
@@ -410,17 +425,20 @@ function LiveAlertCountCard() {
         }
         
         // Process alert data
-        if (event.type === 'message' && isAlertData(event.data)) {
-          const alertData = event.data
+        if ((event.type === 'message' || event.type === 'traffic-queue' || event.type === 'wrong-way-driver' || event.type === 'congestion' || event.type === 'accident' || event.type === 'sensor_fault') && isAlertStreamData(event.data)) {
+          const alertStreamData = event.data
+          console.log('✅ KPI Alert: Processing valid alert data:', alertStreamData)
           
           // Add to recent alerts (keep last 10)
-          setRecentAlerts(prev => [alertData, ...prev.slice(0, 9)])
+          setRecentAlerts(prev => [alertStreamData, ...prev.slice(0, 9)])
           
           // Update live count
           setLiveAlertCount(prev => prev + 1)
           
           // Update timestamp
-          setLastUpdate(alertData.timestamp)
+          setLastUpdate(alertStreamData.timestamp)
+        } else {
+          console.log('❌ KPI Alert: Received non-alert event:', event.type, event.data)
         }
       }
     }

@@ -22,6 +22,7 @@ import { SSEDebugPanel } from '@/components/dashboard/sse-debug'
 import Image from "next/image"
 import { Progress } from "@/components/ui/progress"
 import { SensorHealthOverview } from "@/components/dashboard/sensor-health-overview"
+import { SSEConnectionDebug } from "@/components/debug/sse-connection-debug"
 
 // Loading skeleton components
 function KPIGridSkeleton() {
@@ -267,6 +268,9 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+      
+      {/* SSE Debug Component */}
+      <SSEConnectionDebug />
     </DashboardLayout>
   )
 }
