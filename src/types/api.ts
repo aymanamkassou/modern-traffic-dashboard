@@ -132,6 +132,52 @@ export interface VehicleStats {
     queue_detections: number;
     low_voltage_alerts: number;
   };
+  // Add actual API response structure
+  overallStats: {
+    _id: null;
+    totalVehicles: number;
+    avgSpeed: number;
+    maxSpeed: number;
+    minSpeed: number;
+    avgLength: number;
+    maxLength: number;
+    minLength: number;
+    totalWithStatus: number;
+    uniqueIntersections: any[];
+    uniqueSensorDirections: any[];
+    enhancedRecords: number;
+    enhancementRate: number;
+  };
+  vehicleClassStats: {
+    _id: string;
+    count: number;
+    avgSpeed: number;
+    avgLength: number;
+    avgOccupancy: number;
+    avgTimeGap: number;
+    intersections: any[];
+    weatherConditions: any[];
+    sensorDirections: any[];
+    enhancedLengthRange: string;
+  }[];
+  timeDistribution: {
+    hour: number;
+    count: number;
+    avgSpeed: number;
+    avgLength: number;
+    uniqueVehicleClasses: string[];
+    weatherConditions: any[];
+  }[];
+  enhancedAnalytics: {
+    weatherCorrelation: any[];
+    intersectionStats: any[];
+    dataSourceBreakdown: {
+      total: number;
+      enhanced: number;
+      legacy: number;
+      enhancement_rate: number;
+    };
+  };
 }
 
 // Intersection Data

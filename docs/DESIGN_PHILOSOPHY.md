@@ -130,12 +130,42 @@ We leverage `shadcn/ui` for our base component library, with specific styling an
 
 ---
 
-## 6. Areas for Future Improvement
+## 6. Animation & Motion
+
+Animation is used purposefully to enhance user experience, provide feedback, and guide attention.
+
+### 6.1. Animation Principles
+
+-   **Purposeful Motion**: Every animation serves a specific purpose (feedback, state change, attention guidance)
+-   **Performance First**: CSS animations over JavaScript, optimized for 60fps
+-   **Accessibility**: Respect `prefers-reduced-motion` user preferences
+-   **Consistency**: Standardized timing and easing across the application
+
+### 6.2. Standard Timings
+
+-   **Micro-interactions**: 100-200ms (button hovers, focus states)
+-   **State transitions**: 200-300ms (loading, form validation)
+-   **Layout changes**: 300-500ms (adding/removing items)
+-   **Page transitions**: 400-600ms (route changes, modals)
+
+### 6.3. Implementation
+
+All animations use the custom classes defined in `globals.css` and follow the patterns documented in `ANIMATION_GUIDELINES.md`. Key animations include:
+
+-   `animate-fade-in-up` - For new content appearing
+-   `animate-slide-out-right` - For removing items (like notifications)
+-   `animate-scale-in` - For modal and popup appearances
+-   `animate-pulse` - For loading states
+
+---
+
+## 7. Areas for Future Improvement
 
 1.  **Centralized Color Configuration**: The categorical colors are currently hardcoded. They should be moved into the `tailwind.config.js` theme for easier management and to create reusable utility classes.
 2.  **Navigation Component Abstraction**: The desktop button grid and mobile select menu share significant logic. This could be abstracted into a single, responsive `PageNavigation` component to reduce code duplication.
 3.  **Standardized States**: Formalize the design for empty states (e.g., "No data available") and loading states (e.g., skeletons) to be reused across the application.
 4.  **Accessibility (A11y)**: While `shadcn/ui` provides a good foundation, we must be diligent in adding `aria-label`s for icon-only buttons and ensuring proper focus management in complex components.
 5.  **Form Validation**: Implement a consistent form validation pattern, likely using `zod` for schema definition and a library like `react-hook-form` to handle state and errors.
+6.  **Advanced Animations**: Consider Framer Motion integration for complex animation sequences and gesture-based interactions.
 
 This document is a living guide. As the application evolves, so too will our design philosophy. 

@@ -368,7 +368,7 @@ export function LoadingState({ isLoading, children, skeleton }: LoadingStateProp
 
 ```tsx
 // useReducedMotion.ts
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function useReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)

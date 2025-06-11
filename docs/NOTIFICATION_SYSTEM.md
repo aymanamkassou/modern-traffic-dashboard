@@ -31,6 +31,13 @@ SSE Event → Activity Feed → Notification Context → Toast + Notification Ce
 
 ## Features
 
+### 🎬 Smooth Animations
+
+- **Removal Animation**: Notifications slide out smoothly when removed
+- **Entrance Animation**: New notifications fade in from below
+- **Staggered Clearing**: Multiple notifications animate out with slight delays
+- **Performance Optimized**: CSS-based animations for 60fps performance
+
 ### 🎯 Smart Notification Filtering
 
 - **Critical Only Mode**: Show only critical alerts as toasts (default)
@@ -144,6 +151,51 @@ function NotificationItem({ notification }) {
       <button onClick={() => showNotificationAsToast(notification.id)}>
         Show as Toast
       </button>
+    </div>
+  )
+}
+```
+
+### Animated Notification Removal
+
+```typescript
+function NotificationCenter() {
+  const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set())
+  
+  const handleRemoveNotification = (id: string) => {
+    // Start animation
+    setRemovingNotifications(prev => new Set(prev).add(id))
+    
+    // Delay actual removal to allow animation to complete
+    setTimeout(() => {
+      removeNotification(id)
+      setRemovingNotifications(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
+    }, 300) // Match animation duration
+  }
+
+  return (
+    <div>
+      {notifications.map((notification) => {
+        const isRemoving = removingNotifications.has(notification.id)
+        
+        return (
+          <div
+            key={notification.id}
+            className={cn(
+              "transition-all duration-300 ease-out",
+              isRemoving 
+                ? "animate-slide-out-right" 
+                : "animate-fade-in-up"
+            )}
+          >
+            {/* Notification content */}
+          </div>
+        )
+      })}
     </div>
   )
 }
