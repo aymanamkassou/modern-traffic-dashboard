@@ -7,6 +7,7 @@ import { TwentyFourHourTrendChart } from '@/components/dashboard/trend-chart'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
 import { 
   Monitor, 
   Activity, 
@@ -15,7 +16,8 @@ import {
   AlertTriangle,
   Shield,
   Zap,
-  ExternalLink
+  ExternalLink,
+  BarChart3
 } from 'lucide-react'
 import Link from 'next/link'
 import { SSEDebugPanel } from '@/components/dashboard/sse-debug'
@@ -64,32 +66,32 @@ function QuickActions() {
       description: 'Interactive traffic monitoring',
       icon: MapPin,
       href: '/map',
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10'
+      color: 'text-info',
+      bgColor: 'bg-info/10'
     },
     {
       title: 'Traffic Analysis',
       description: 'Detailed flow metrics',
       icon: TrendingUp,
       href: '/traffic',
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10'
+      color: 'text-success',
+      bgColor: 'bg-success/10'
     },
     {
       title: 'Alert Management',
       description: 'Critical system alerts',
       icon: AlertTriangle,
       href: '/alerts',
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10'
+      color: 'text-warning',
+      bgColor: 'bg-warning/10'
     },
     {
       title: 'System Health',
       description: 'Sensor status & diagnostics',
       icon: Shield,
       href: '/sensors',
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10'
     }
   ]
 
@@ -99,21 +101,21 @@ function QuickActions() {
         const Icon = action.icon
         return (
           <Link key={action.href} href={action.href}>
-            <Card className="group hover:shadow-md transition-all duration-200 cursor-pointer border-muted hover:border-border">
+            <Card className="group hover-lift cursor-pointer border-muted hover:border-primary/20 hover:bg-accent/5 focus-ring">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${action.bgColor} group-hover:scale-110 transition-transform`}>
-                    <Icon className={`h-4 w-4 ${action.color}`} />
+                  <div className={`p-2 rounded-lg ${action.bgColor} hover-scale group-hover:shadow-lg transition-all duration-200`} style={{ transitionTimingFunction: 'var(--ease-out-back)' }}>
+                    <Icon className={`h-4 w-4 ${action.color} group-hover:scale-110 transition-transform duration-200`} style={{ transitionTimingFunction: 'var(--ease-out-back)' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm group-hover:text-primary transition-colors">
+                    <h3 className="font-medium text-sm group-hover:text-primary transition-colors duration-200" style={{ transitionTimingFunction: 'var(--ease-out-quart)' }}>
                       {action.title}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 group-hover:text-muted-foreground/80 transition-colors duration-200" style={{ transitionTimingFunction: 'var(--ease-out-quart)' }}>
                       {action.description}
                     </p>
                   </div>
-                  <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1 group-hover:scale-110" style={{ transitionTimingFunction: 'var(--ease-out-back)' }} />
                 </div>
               </CardContent>
             </Card>
@@ -127,15 +129,15 @@ function QuickActions() {
 // System Status Banner
 function SystemStatusBanner() {
   return (
-    <Card className="border-green-500/20 bg-green-500/5">
+    <Card className="border-success/20 bg-success/5">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
               <span className="text-sm font-medium">System Operational</span>
             </div>
-            <Badge variant="outline" className="text-xs border-green-500/30 text-green-700">
+            <Badge variant="outline" className="text-xs border-success/30 text-success-foreground">
               All Services Online
             </Badge>
           </div>
@@ -166,17 +168,12 @@ export default function OverviewPage() {
       <div className="space-y-8">
         {/* Header Section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Traffic Control Center</h1>
-              <p className="text-muted-foreground mt-1">
-                Real-time monitoring and intelligent traffic management system
-              </p>
-            </div>
-            <Badge variant="outline" className="text-xs">
-              Live Dashboard
-            </Badge>
-          </div>
+          <PageHeader
+            title="Traffic Control Center"
+            description="Real-time monitoring and intelligent traffic management system"
+            icon={BarChart3}
+            badge="Live Dashboard"
+          />
           
           {/* System Status Banner */}
           <SystemStatusBanner />

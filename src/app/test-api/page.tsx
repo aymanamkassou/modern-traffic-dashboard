@@ -11,6 +11,8 @@ import { EndpointTester } from '@/components/testing/endpoint-tester';
 import { StreamTester } from '@/components/testing/stream-tester';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { DashboardLayout } from '@/components/dashboard/layout';
+import { PageHeader } from '@/components/ui/page-header';
+import { ResponsiveTabNavigation, TabItem } from '@/components/ui/responsive-tab-navigation';
 
 // Parameter type definition
 interface Parameter {
@@ -463,15 +465,12 @@ export default function TestApiPage() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">API Testing Interface</h1>
-            <p className="text-muted-foreground">
-              Comprehensive testing suite for all traffic monitoring API endpoints and real-time streams
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
+        <PageHeader
+          title="API Testing Interface"
+          description="Comprehensive testing suite for all traffic monitoring API endpoints and real-time streams"
+          icon={Database}
+          actions={<ThemeToggle />}
+        />
 
         {/* Navigation Controls */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

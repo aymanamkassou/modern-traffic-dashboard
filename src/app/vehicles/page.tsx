@@ -6,30 +6,43 @@ import { VehicleStatsDashboard } from '@/components/vehicles/vehicle-stats-dashb
 import { LiveVehicleLog } from '@/components/vehicles/live-vehicle-log'
 import { StatusAnomalyChart } from '@/components/vehicles/status-anomaly-chart'
 import { VehicleSpecsReference } from '@/components/vehicles/vehicle-specs-reference'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageComponentList } from '@/components/ui/animated-list'
+import { Car } from 'lucide-react'
 
 export default function VehiclesPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-8 animate-fade-in-up">
+      <div className="space-y-8">
         {/* Page Header */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Vehicle Analytics</h1>
-          <p className="text-muted-foreground">
-            Comprehensive vehicle detection, classification, and behavior analysis for traffic engineering insights.
-          </p>
-        </div>
+        <PageHeader
+          title="Vehicle Analytics"
+          description="Comprehensive vehicle detection, classification, and behavior analysis for traffic engineering insights."
+          icon={Car}
+          badge="Real-time Data"
+        />
 
-        {/* Vehicle Statistics Dashboard */}
-        <VehicleStatsDashboard />
-
-        {/* Live Vehicle Log */}
-        <LiveVehicleLog />
-
-        {/* Status Anomaly Analysis */}
-        <StatusAnomalyChart />
-
-        {/* Vehicle Specifications Reference */}
-        <VehicleSpecsReference />
+        {/* Vehicle Components */}
+        <PageComponentList
+          components={[
+            {
+              id: 'vehicle-stats',
+              component: <VehicleStatsDashboard />
+            },
+            {
+              id: 'live-log',
+              component: <LiveVehicleLog />
+            },
+            {
+              id: 'anomaly-chart',
+              component: <StatusAnomalyChart />
+            },
+            {
+              id: 'specs-reference',
+              component: <VehicleSpecsReference />
+            }
+          ]}
+        />
       </div>
     </DashboardLayout>
   )
