@@ -33,8 +33,8 @@ export function useAnimation(
   const [isAnimating, setIsAnimating] = useState(false)
   const [shouldRender, setShouldRender] = useState(trigger)
   const prefersReducedMotion = useReducedMotion()
-  const timeoutRef = useRef<NodeJS.Timeout>()
-  const delayTimeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const delayTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const effectiveDuration = prefersReducedMotion ? 0 : duration
   const effectiveDelay = prefersReducedMotion ? 0 : delay
