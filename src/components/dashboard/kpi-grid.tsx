@@ -444,7 +444,7 @@ function LiveAlertCountCard() {
     }
   )
 
-  const displayCount = (alertData as any)?.count || liveAlertCount
+  const displayCount =  liveAlertCount || (alertData as any)?.count 
   const criticalAlerts = recentAlerts.filter(alert => 
     alert.type === 'traffic-queue' || alert.type === 'congestion'
   ).length

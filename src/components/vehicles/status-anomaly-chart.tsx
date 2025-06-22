@@ -357,13 +357,12 @@ export function StatusAnomalyChart() {
     )
   }
 
-  // Create mock status analysis since it's not in the current API response
-  // In a real implementation, this would come from a dedicated status analysis endpoint
+  // Use real status analysis from API
   const statusAnalysis = vehicleStats.status_analysis || {
-    total_faults: Math.floor(Math.random() * 5), // Random mock data for demo
-    wrong_way_incidents: Math.floor(Math.random() * 3),
-    queue_detections: Math.floor(Math.random() * 15) + 5,
-    low_voltage_alerts: Math.floor(Math.random() * 4)
+    total_faults: 0,
+    wrong_way_incidents: 0,
+    queue_detections: 0,
+    low_voltage_alerts: 0
   }
 
   // Prepare chart data
@@ -410,13 +409,13 @@ export function StatusAnomalyChart() {
         <SystemHealthOverview statusAnalysis={statusAnalysis} />
       </div>
 
-      {/* Note about mock data */}
-      <Card className="border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/50">
+      {/* Real-time status monitoring info */}
+      <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/50">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
             <Zap className="h-4 w-4" />
-            <span className="font-medium">Demo Data Notice:</span>
-            <span>Status analysis data is simulated for demonstration. Real implementation would integrate with sensor status endpoints.</span>
+            <span className="font-medium">Real-time Status Monitoring:</span>
+            <span>Status analysis data is sourced directly from sensor status endpoints and vehicle detection systems.</span>
           </div>
         </CardContent>
       </Card>

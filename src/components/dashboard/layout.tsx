@@ -8,6 +8,7 @@ import { useAlertCount } from '@/lib/api-client'
 import { Separator } from '@/components/ui/separator'
 import { NotificationCenter } from './notification-center'
 import { Menu, Search, User } from 'lucide-react'
+import { ThemeToggle } from '../ui/theme-toggle'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -43,7 +44,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 
                 {/* Notifications */}
                 <NotificationCenter />
-                
+                <ThemeToggle />
                 {/* User Menu */}
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <User className="h-4 w-4" />

@@ -1,13 +1,14 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { Navigation, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import { Navigation, TrendingUp, TrendingDown, Minus, Wifi, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTrafficData } from '@/lib/api-client'
+import { useServerSentEvents } from '@/hooks/use-server-sent-events'
+import { TrafficStreamEvent, isTrafficData } from '@/types/sse-events'
 
 interface DirectionalFlowGaugesProps {
   intersectionId: string
@@ -25,6 +26,7 @@ interface DirectionData {
   lastUpdate: string
   vehicleCount: number
   sensorId: string
+  history: number[] // For trend calculation
 }
 
 const DIRECTION_CONFIG = {
@@ -193,123 +195,103 @@ export function DirectionalFlowGauges({ intersectionId, className }: Directional
   const [directionalData, setDirectionalData] = useState<DirectionData[]>([])
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('')
 
-  // Fetch traffic data using the working API
-  const { data: trafficResponse, isLoading, error, refetch } = useTrafficData({
-    intersection_id: intersectionId,
-    limit: 100,
-    include_enhanced: true
+  // SSE connection for real-time traffic data
+  const sseUrl = intersectionId ? `http://localhost:3001/api/traffic/stream` : null
+  
+  const {
+    isConnected,
+    events,
+    error: sseError,
+    connect,
+    disconnect
+  } = useServerSentEvents(sseUrl, {
+    maxEvents: 200,
+    autoConnect: true,
+    onEvent: useCallback((event) => {
+      // Process incoming traffic events in real-time
+      if (event.data && isTrafficData(event.data)) {
+        const trafficData = event.data
+        
+        // Only process data for the selected intersection
+        if (trafficData.intersection_id === intersectionId) {
+          processRealTimeTrafficData(trafficData)
+        }
+      }
+    }, [intersectionId])
   })
 
-  // Auto-refresh every 15 seconds
-  useEffect(() => {
-    if (!intersectionId) return
+  // Process incoming real-time traffic data
+  const processRealTimeTrafficData = useCallback((trafficData: any) => {
+    if (!trafficData.sensor_direction) return
 
-    const interval = setInterval(() => {
-      refetch()
-    }, 15000) // 15 seconds
-
-    return () => clearInterval(interval)
-  }, [intersectionId, refetch])
-
-  // Process traffic data
-  useEffect(() => {
-    if (trafficResponse?.data && intersectionId) {
-      processTrafficData(trafficResponse.data)
-    }
-  }, [trafficResponse, intersectionId])
-
-  const processTrafficData = (trafficData: any[]) => {
-    // Filter data for the selected intersection
-    const intersectionData = trafficData.filter(item => 
-      item.intersection_id === intersectionId
-    )
-
-    if (intersectionData.length === 0) {
-      setDirectionalData([])
-      return
-    }
-
-    // Group by direction and calculate metrics
-    const directions: DirectionData[] = ['north', 'south', 'east', 'west'].map(direction => {
-      const directionData = intersectionData
-        .filter(item => item.sensor_direction === direction)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-      if (directionData.length === 0) {
-        return null
-      }
-
-      const latestData = directionData[0]
-      const previousData = directionData[1] // For trend calculation
-
-      // Use real backend data
-      const flowRate = Math.round(latestData.vehicle_flow_rate || 0)
-      const vehicleCount = latestData.vehicle_number || 0
-      const density = latestData.density || 0
-
-      // Calculate trend if we have previous data
+    const direction = trafficData.sensor_direction as 'north' | 'south' | 'east' | 'west'
+    
+    setDirectionalData(prev => {
+      const existing = prev.find(d => d.direction === direction)
+      const flowRate = Math.round(trafficData.vehicle_flow_rate || 0)
+      const vehicleCount = trafficData.vehicle_number || 0
+      const density = trafficData.density || 0
+      
+      // Calculate trend from history
       let trend: 'up' | 'down' | 'stable' = 'stable'
       let trendValue = 0
       
-      if (previousData && previousData.vehicle_flow_rate) {
-        const currentFlow = latestData.vehicle_flow_rate || 0
-        const previousFlow = previousData.vehicle_flow_rate || 0
-        const diff = currentFlow - previousFlow
-        const percentChange = previousFlow > 0 ? (diff / previousFlow) * 100 : 0
-        
-        if (Math.abs(percentChange) > 5) { // Only show trend if > 5% change
-          trend = percentChange > 0 ? 'up' : 'down'
-          trendValue = Math.round(Math.abs(percentChange))
+      if (existing && existing.history.length > 0) {
+        const avgHistory = existing.history.reduce((sum, val) => sum + val, 0) / existing.history.length
+        if (avgHistory > 0) {
+          const percentChange = ((flowRate - avgHistory) / avgHistory) * 100
+          if (Math.abs(percentChange) > 5) {
+            trend = percentChange > 0 ? 'up' : 'down'
+            trendValue = Math.round(Math.abs(percentChange))
+          }
         }
       }
 
-      // Determine congestion level based on density
+      // Determine congestion level
       const congestionLevel = 
         density > 70 ? 'critical' :
         density > 50 ? 'high' :
         density > 30 ? 'medium' : 'low'
 
-      return {
-        direction: direction as 'north' | 'south' | 'east' | 'west',
-        label: DIRECTION_CONFIG[direction as keyof typeof DIRECTION_CONFIG].label,
-        icon: DIRECTION_CONFIG[direction as keyof typeof DIRECTION_CONFIG].icon,
+      const newData: DirectionData = {
+        direction,
+        label: DIRECTION_CONFIG[direction].label,
+        icon: DIRECTION_CONFIG[direction].icon,
         flowRate,
         trend,
         trendValue,
         congestionLevel: congestionLevel as 'low' | 'medium' | 'high' | 'critical',
-        lastUpdate: new Date(latestData.timestamp).toLocaleTimeString(),
+        lastUpdate: new Date().toLocaleTimeString(),
         vehicleCount,
-        sensorId: latestData.sensor_id
+        sensorId: trafficData.sensor_id,
+        history: existing ? [...existing.history.slice(-9), flowRate] : [flowRate]
       }
-    }).filter(Boolean) as DirectionData[]
 
-    setDirectionalData(directions)
+      const otherDirections = prev.filter(d => d.direction !== direction)
+      return [...otherDirections, newData].sort((a, b) => {
+        const order = ['north', 'east', 'south', 'west']
+        return order.indexOf(a.direction) - order.indexOf(b.direction)
+      })
+    })
+
     setLastUpdateTime(new Date().toLocaleTimeString())
-  }
+  }, [])
 
-  if (error) {
-    return (
-      <div className={cn("text-center py-8", className)}>
-        <p className="text-destructive">Failed to load directional flow data</p>
-        <button 
-          onClick={() => refetch()} 
-          className="mt-2 text-sm text-primary hover:underline"
-        >
-          Try again
-        </button>
-      </div>
-    )
-  }
+  // Filter relevant events from SSE buffer
+  const relevantEvents = useMemo(() => {
+    return events
+      .filter(event => event.data && isTrafficData(event.data))
+      .filter(event => event.data.intersection_id === intersectionId)
+      .slice(-20) // Keep last 20 relevant events
+  }, [events, intersectionId])
 
-  if (isLoading) {
-    return (
-      <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4", className)}>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <DirectionalGaugeSkeleton key={i} />
-        ))}
-      </div>
-    )
-  }
+  // Connection status
+  const connectionStatus = useMemo(() => {
+    if (!intersectionId) return 'inactive'
+    if (sseError) return 'error'
+    if (isConnected) return 'connected'
+    return 'connecting'
+  }, [intersectionId, sseError, isConnected])
 
   if (!intersectionId) {
     return (
@@ -319,23 +301,33 @@ export function DirectionalFlowGauges({ intersectionId, className }: Directional
     )
   }
 
-  if (directionalData.length === 0) {
+  if (sseError) {
     return (
       <div className={cn("text-center py-8", className)}>
-        <p className="text-muted-foreground">No directional data available for this intersection</p>
+        <p className="text-destructive">Failed to connect to traffic stream: {sseError}</p>
         <button 
-          onClick={() => refetch()} 
+          onClick={() => connect()} 
           className="mt-2 text-sm text-primary hover:underline"
         >
-          Refresh
+          Try reconnecting
         </button>
+      </div>
+    )
+  }
+
+  if (!isConnected) {
+    return (
+      <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4", className)}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <DirectionalGaugeSkeleton key={i} />
+        ))}
       </div>
     )
   }
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Header with status */}
+      {/* Header with SSE status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Navigation className="h-4 w-4" />
@@ -343,10 +335,28 @@ export function DirectionalFlowGauges({ intersectionId, className }: Directional
         </div>
         
         <div className="flex items-center gap-2">
-          <Badge variant="default">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-2" />
-            Live Data
+          <Badge variant={connectionStatus === 'connected' ? 'default' : 'secondary'}>
+            {connectionStatus === 'connected' && (
+              <>
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-2" />
+                <Wifi className="h-3 w-3 mr-1" />
+                Live SSE
+              </>
+            )}
+            {connectionStatus === 'connecting' && (
+              <>
+                <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse mr-2" />
+                Connecting...
+              </>
+            )}
+            {connectionStatus === 'error' && (
+              <>
+                <WifiOff className="h-3 w-3 mr-1" />
+                Offline
+              </>
+            )}
           </Badge>
+          
           {lastUpdateTime && (
             <span className="text-xs text-muted-foreground" suppressHydrationWarning>
               Updated: {lastUpdateTime}
@@ -356,19 +366,19 @@ export function DirectionalFlowGauges({ intersectionId, className }: Directional
       </div>
 
       {/* Directional Gauges Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {directionalData.map((data) => (
-          <DirectionalGauge key={data.direction} data={data} />
-        ))}
-      </div>
-
-      {/* Summary Info */}
-      <div className="text-center text-xs text-muted-foreground">
-        <p>
-          Flow rates calculated from vehicle flow rate measurements. 
-          Auto-refresh every 15 seconds. Trends based on previous measurement comparison.
-        </p>
-      </div>
+      {directionalData.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">
+            Waiting for traffic data from intersection {intersectionId}...
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {directionalData.map((data) => (
+            <DirectionalGauge key={data.direction} data={data} />
+          ))}
+        </div>
+      )}
     </div>
   )
 } 

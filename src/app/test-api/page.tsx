@@ -469,7 +469,6 @@ export default function TestApiPage() {
           title="API Testing Interface"
           description="Comprehensive testing suite for all traffic monitoring API endpoints and real-time streams"
           icon={Database}
-          actions={<ThemeToggle />}
         />
 
         {/* Navigation Controls */}

@@ -8,7 +8,6 @@ interface PageHeaderProps {
   description: string
   icon: LucideIcon
   badge?: string
-  actions?: React.ReactNode
   variant?: 'default' | 'card'
   className?: string
 }
@@ -18,7 +17,6 @@ export function PageHeader({
   description, 
   icon: Icon, 
   badge, 
-  actions,
   variant = 'default',
   className
 }: PageHeaderProps) {
@@ -40,7 +38,6 @@ export function PageHeader({
           <p className="text-muted-foreground mt-1">{description}</p>
         </div>
       </div>
-      {actions && <div>{actions}</div>}
     </div>
   )
 

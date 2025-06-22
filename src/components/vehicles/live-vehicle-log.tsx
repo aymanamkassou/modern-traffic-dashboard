@@ -237,11 +237,12 @@ export function LiveVehicleLog() {
 
   // Combine API data and live data
   const allVehicles = useMemo(() => {
-    const apiVehicles = vehicleData?.data || []
+    // Handle both direct array and response object formats
+    const apiVehicles = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.data || [])
     
     if (isLiveMode && liveVehicles.length > 0) {
       // Convert live vehicles to match API format and combine
-      const convertedLiveVehicles = liveVehicles.map(lv => ({
+      const convertedLiveVehicles = liveVehicles.map((lv: VehicleStreamData) => ({
         _id: lv.id,
         vehicle_id: lv.id,
         sensor_id: lv.sensor_id,
@@ -267,7 +268,7 @@ export function LiveVehicleLog() {
     }
     
     return apiVehicles
-  }, [vehicleData?.data, liveVehicles, isLiveMode])
+  }, [vehicleData, liveVehicles, isLiveMode])
 
   // Filter vehicles based on search and filters
   const filteredVehicles = useMemo(() => {
@@ -371,7 +372,7 @@ export function LiveVehicleLog() {
               <SelectItem value="all">All Classes</SelectItem>
               {uniqueClasses.map(cls => (
                 <SelectItem key={cls} value={cls}>
-                  {cls.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {cls.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </SelectItem>
               ))}
             </SelectContent>

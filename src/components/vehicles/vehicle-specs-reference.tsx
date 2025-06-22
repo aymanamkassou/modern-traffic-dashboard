@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
+import { useVehicleSpecifications } from '@/lib/api-client'
 import { 
   Car, 
   Truck, 
@@ -19,7 +20,8 @@ import {
   Battery,
   Navigation,
   Users,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -333,8 +335,121 @@ function StatusDefinitionCard({ type, definition }: { type: string; definition: 
 
 // Main Vehicle Specs Reference Component
 export function VehicleSpecsReference() {
+  const { data: specifications, isLoading, error, refetch } = useVehicleSpecifications()
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader>
+              <div className="h-6 bg-muted rounded w-1/3" />
+              <div className="h-4 bg-muted rounded w-2/3" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <div key={j} className="h-16 bg-muted rounded" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="border-red-500/50">
+        <CardHeader>
+          <CardTitle className="text-red-500">Error Loading Vehicle Specifications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            {error.message || 'Failed to load vehicle specifications. Please try again later.'}
+          </p>
+          <Button onClick={() => refetch()} size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!specifications) {
+    return (
+      <Card className="border-yellow-500/50">
+        <CardHeader>
+          <CardTitle className="text-yellow-500">No Specifications Available</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Vehicle specifications data is not currently available.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Create enhanced vehicle specs from API data
+  const apiVehicleSpecs = Object.entries(specifications.enhanced_vehicle_lengths || {}).reduce((acc, [type, length]) => {
+    acc[type] = {
+      label: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+      icon: vehicleSpecs[type as keyof typeof vehicleSpecs]?.icon || Car,
+      description: vehicleSpecs[type as keyof typeof vehicleSpecs]?.description || `Enhanced ${type.replace('_', ' ')} detection`,
+      typical_length: length,
+      typical_speed: vehicleSpecs[type as keyof typeof vehicleSpecs]?.typical_speed || '20-80 km/h',
+      characteristics: vehicleSpecs[type as keyof typeof vehicleSpecs]?.characteristics || [
+        'Enhanced sensor detection',
+        'Real-time classification',
+        'Precise length measurement',
+        'Speed and direction tracking'
+      ],
+      detection_notes: vehicleSpecs[type as keyof typeof vehicleSpecs]?.detection_notes || 'Enhanced detection from Rust simulator integration'
+    }
+    return acc
+  }, {} as any)
+
+  // Create status definitions from API data
+  const apiStatusDefinitions = Object.entries(specifications.status_byte_decoding || {}).reduce((acc, [key, description]) => {
+    const bitNum = key.replace('bit_', '')
+    const statusKey = key === 'bit_2' ? 'hardware_fault' : 
+                     key === 'bit_3' ? 'low_voltage' :
+                     key === 'bit_4' ? 'wrong_way_driver' :
+                     key === 'bit_5' ? 'queue_detected' : key
+    
+    if (statusDefinitions[statusKey as keyof typeof statusDefinitions]) {
+      acc[statusKey] = {
+        ...statusDefinitions[statusKey as keyof typeof statusDefinitions],
+        description: description.replace(/\(0x[0-9A-F]+\)/g, '').trim()
+      }
+    }
+    return acc
+  }, {} as any)
+
   return (
     <div className="space-y-6">
+      {/* Integration Info */}
+      {specifications.integration_info && (
+        <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 mb-2">
+              <Zap className="h-4 w-4" />
+              <span className="font-medium">{specifications.integration_info.source} v{specifications.integration_info.version}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {specifications.integration_info.features.map((feature: string, index: number) => (
+                <Badge key={index} variant="outline" className="text-xs">
+                  {feature}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Vehicle Classifications */}
       <Card className="animate-fade-in-up">
         <CardHeader>
@@ -343,11 +458,11 @@ export function VehicleSpecsReference() {
             Vehicle Classifications
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Detailed specifications and characteristics for each vehicle type detected by the system
+            Real-time specifications from the enhanced traffic simulator system
           </p>
         </CardHeader>
         <CardContent className="space-y-2">
-          {Object.entries(vehicleSpecs).map(([type, spec]) => (
+          {Object.entries(apiVehicleSpecs).map(([type, spec]) => (
             <VehicleSpecCard key={type} type={type} spec={spec} />
           ))}
         </CardContent>
@@ -361,11 +476,11 @@ export function VehicleSpecsReference() {
             Status Byte Definitions
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Detailed explanation of status flags and their implications for system operation
+            Real-time status flag definitions from sensor integration
           </p>
         </CardHeader>
         <CardContent className="space-y-2">
-          {Object.entries(statusDefinitions).map(([type, definition]) => (
+          {Object.entries(apiStatusDefinitions).map(([type, definition]) => (
             <StatusDefinitionCard key={type} type={type} definition={definition} />
           ))}
         </CardContent>
@@ -379,34 +494,12 @@ export function VehicleSpecsReference() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Motorcycle:</span>
-                <span className="font-mono">15-25 dm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Passenger Car:</span>
-                <span className="font-mono">35-50 dm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>SUV:</span>
-                <span className="font-mono">45-55 dm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Pickup Truck:</span>
-                <span className="font-mono">50-65 dm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Delivery Van:</span>
-                <span className="font-mono">45-70 dm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Bus:</span>
-                <span className="font-mono">80-180 dm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Semi Truck:</span>
-                <span className="font-mono">150-220 dm</span>
-              </div>
+              {Object.entries(specifications.enhanced_vehicle_lengths || {}).map(([type, length]) => (
+                <div key={type} className="flex justify-between">
+                  <span>{type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:</span>
+                  <span className="font-mono">{length}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -417,26 +510,19 @@ export function VehicleSpecsReference() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between items-center">
-                <span>Bit 0:</span>
-                <Badge variant="destructive" className="text-xs">Hardware Fault</Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Bit 1:</span>
-                <Badge variant="secondary" className="text-xs">Low Voltage</Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Bit 2:</span>
-                <Badge variant="destructive" className="text-xs">Wrong Way</Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Bit 3:</span>
-                <Badge variant="outline" className="text-xs">Queue Detected</Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Bits 4-7:</span>
-                <Badge variant="outline" className="text-xs">Reserved</Badge>
-              </div>
+              {Object.entries(specifications.status_byte_decoding || {}).map(([key, description]) => {
+                const bitNum = key.replace('bit_', '')
+                const variant = bitNum === '2' || bitNum === '4' ? 'destructive' :
+                               bitNum === '3' ? 'secondary' : 'outline'
+                return (
+                  <div key={key} className="flex justify-between items-center">
+                    <span>Bit {bitNum}:</span>
+                    <Badge variant={variant} className="text-xs">
+                      {description.replace(/\(0x[0-9A-F]+\)/g, '').trim()}
+                    </Badge>
+                  </div>
+                )
+              })}
             </div>
             <div className="mt-4 p-3 bg-muted/50 rounded-lg">
               <div className="text-xs text-muted-foreground">

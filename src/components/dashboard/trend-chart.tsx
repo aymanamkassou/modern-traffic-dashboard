@@ -21,48 +21,65 @@ import {
   TrendingDown, 
   BarChart3, 
   Clock,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { format, subHours } from 'date-fns'
+import { ChartSkeleton } from '@/components/ui/loading-skeletons'
 
-// Generate mock 24-hour data (in real app, this would come from API)
-const generateMock24HourData = () => {
-  const data = []
-  const now = new Date()
+// Transform API data for chart display with proper hourly aggregation
+const transformHistoricalData = (data: any[]) => {
+  if (!data || data.length === 0) return [];
   
-  for (let i = 23; i >= 0; i--) {
-    const hour = subHours(now, i)
-    const hourValue = hour.getHours()
-    
-    // Simulate traffic patterns (higher during rush hours)
-    let baseVolume = 200
-    if (hourValue >= 7 && hourValue <= 9) baseVolume = 800 // Morning rush
-    else if (hourValue >= 17 && hourValue <= 19) baseVolume = 900 // Evening rush
-    else if (hourValue >= 12 && hourValue <= 14) baseVolume = 600 // Lunch time
-    else if (hourValue >= 22 || hourValue <= 5) baseVolume = 100 // Night time
-    
-    // Add some randomness
-    const volume = Math.floor(baseVolume + (Math.random() - 0.5) * 200)
-    
-    // Speed inversely related to volume (more congestion = slower speed)
-    const baseSpeed = 45
-    const speedReduction = (volume / 1000) * 20
-    const speed = Math.max(15, baseSpeed - speedReduction + (Math.random() - 0.5) * 10)
-    
-    data.push({
-      hour: format(hour, 'HH:mm'),
-      hourLabel: format(hour, 'ha'),
-      volume,
-      speed: Math.round(speed * 10) / 10,
-      timestamp: hour.toISOString(),
-      // Additional metrics for tooltip
-      density: Math.round((volume / 100) * 10) / 10,
-      efficiency: Math.round((speed / 45) * 100)
-    })
-  }
+  // Group data by hour
+  const hourlyGroups = new Map<number, any[]>();
   
-  return data
+  data.forEach((item) => {
+    const timestamp = new Date(item.timestamp);
+    const hour = timestamp.getHours();
+    
+    if (!hourlyGroups.has(hour)) {
+      hourlyGroups.set(hour, []);
+    }
+    hourlyGroups.get(hour)!.push(item);
+  });
+  
+  // Aggregate each hour's data
+  const aggregatedData = Array.from(hourlyGroups.entries()).map(([hour, items]) => {
+    const hourLabel = `${hour.toString().padStart(2, '0')}:00`;
+    
+    // Calculate aggregated values
+    const avgSpeed = items.reduce((sum, item) => sum + (item.speed || 0), 0) / items.length;
+    const avgDensity = items.reduce((sum, item) => sum + (item.density || 0), 0) / items.length;
+    const totalVolume = items.reduce((sum, item) => sum + (item.volume || item.vehicle_number || 0), 0);
+    
+    // Use the most recent timestamp for this hour
+    const latestItem = items.reduce((latest, item) => 
+      new Date(item.timestamp) > new Date(latest.timestamp) ? item : latest
+    );
+    
+    // Calculate efficiency based on aggregated speed and density
+    const efficiency = avgSpeed && avgDensity 
+      ? Math.round(Math.min(100, (avgSpeed / Math.max(1, avgDensity)) * 10))
+      : 0;
+    
+    return {
+      volume: Math.round(totalVolume),
+      speed: Math.round(avgSpeed * 10) / 10, // Round to 1 decimal
+      density: Math.round(avgDensity * 10) / 10, // Round to 1 decimal
+      hourLabel,
+      hour,
+      efficiency,
+      originalTimestamp: latestItem.timestamp,
+      sensor_id: latestItem.sensor_id,
+      location_id: latestItem.location_id,
+      // Additional metadata
+      dataPointsCount: items.length // Show how many records were aggregated
+    };
+  });
+  
+  // Sort by hour
+  return aggregatedData.sort((a, b) => a.hour - b.hour);
 }
 
 // Custom Tooltip Component
@@ -76,20 +93,46 @@ function CustomTooltip({ active, payload, label }: any) {
         <div className="space-y-1 text-sm">
           <div className="flex items-center justify-between gap-4">
             <span className="text-blue-500">Vehicle Volume:</span>
-            <span className="font-mono">{data.volume.toLocaleString()}</span>
+            <span className="font-mono">{(data.volume || 0).toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-green-500">Avg Speed:</span>
-            <span className="font-mono">{data.speed} km/h</span>
+            <span className="font-mono">{(data.speed || 0).toFixed(1)} km/h</span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-muted-foreground">Density:</span>
-            <span className="font-mono">{data.density}</span>
+            <span className="font-mono">{(data.density || 0).toFixed(1)}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-muted-foreground">Efficiency:</span>
-            <span className="font-mono">{data.efficiency}%</span>
+            <span className="font-mono">{(data.efficiency || 0)}%</span>
           </div>
+          {data.originalTimestamp && (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Time:</span>
+              <span className="font-mono text-xs">
+                {new Date(data.originalTimestamp).toLocaleString()}
+              </span>
+            </div>
+          )}
+          {data.sensor_id && (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Sensor:</span>
+              <span className="font-mono text-xs">{data.sensor_id}</span>
+            </div>
+          )}
+          {data.location_id && (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Location:</span>
+              <span className="font-mono text-xs">{data.location_id}</span>
+            </div>
+          )}
+          {data.dataPointsCount && data.dataPointsCount > 1 && (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Data Points:</span>
+              <span className="font-mono text-xs">{data.dataPointsCount} aggregated</span>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -100,12 +143,70 @@ function CustomTooltip({ active, payload, label }: any) {
 
 // Main 24-Hour Trend Chart Component
 export function TwentyFourHourTrendChart() {
-  const { data: historicalData, isLoading, refetch } = useHistoricalTraffic({ 
+  const { data: historicalData, isLoading, error, refetch, isFetching } = useHistoricalTraffic({ 
     aggregation: 'hour' 
   })
   
-  // Use mock data for now (in real app, use historicalData)
-  const chartData = generateMock24HourData()
+  // Debug logging
+  React.useEffect(() => {
+    console.log('🔍 Trend Chart Debug:', {
+      isLoading,
+      isFetching,
+      error: error?.message,
+      dataLength: historicalData?.length,
+      sampleData: historicalData?.slice(0, 2)
+    });
+  }, [isLoading, isFetching, error, historicalData]);
+  
+  // Transform API data for chart display
+  const chartData = transformHistoricalData(historicalData || [])
+  
+  // Show loading state
+  if (isLoading) {
+    return <ChartSkeleton height="h-96" />
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Card className="relative overflow-hidden">
+        <CardContent className="p-6">
+          <div className="text-center space-y-4">
+            <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+            <div>
+              <h3 className="font-medium">Failed to load historical traffic data</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {error.message || 'An unexpected error occurred'}
+              </p>
+            </div>
+            <Button onClick={() => refetch()} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+  
+  // Show empty state if no data
+  if (!chartData || chartData.length === 0) {
+    return (
+      <Card className="relative overflow-hidden">
+        <CardContent className="p-6">
+          <div className="text-center space-y-4">
+            <BarChart3 className="h-8 w-8 text-muted-foreground mx-auto" />
+            <div>
+              <h3 className="font-medium">No historical data available</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Historical traffic data will appear here once available
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
   
   // Calculate trend statistics
   const currentHour = chartData[chartData.length - 1]
@@ -118,11 +219,15 @@ export function TwentyFourHourTrendChart() {
     : 0
   
   // Calculate daily totals
-  const totalVolume = chartData.reduce((sum, item) => sum + item.volume, 0)
-  const avgSpeed = chartData.reduce((sum, item) => sum + item.speed, 0) / chartData.length
-  const peakHour = chartData.reduce((max, item) => 
-    item.volume > max.volume ? item : max, chartData[0]
-  )
+  const totalVolume = chartData.reduce((sum: number, item: any) => sum + (item.volume || 0), 0)
+  const avgSpeed = chartData.length > 0 
+    ? chartData.reduce((sum: number, item: any) => sum + (item.speed || 0), 0) / chartData.length 
+    : 0
+  const peakHour = chartData.length > 0 
+    ? chartData.reduce((max: any, item: any) => 
+        (item.volume || 0) > (max.volume || 0) ? item : max, chartData[0]
+    )
+    : null
 
   return (
     <Card className="relative overflow-hidden">
@@ -130,7 +235,7 @@ export function TwentyFourHourTrendChart() {
         <div className="space-y-1">
           <CardTitle className="text-sm font-medium">24-Hour Traffic Trends</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Vehicle volume and average speed over time
+            Vehicle volume and average speed over time • {chartData.length} data points
           </p>
         </div>
         
@@ -162,7 +267,9 @@ export function TwentyFourHourTrendChart() {
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">Peak Hour</div>
-              <div className="font-mono font-medium">{peakHour.hourLabel}</div>
+              <div className="font-mono font-medium">
+                {peakHour?.hourLabel || 'N/A'}
+              </div>
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">Current Trend</div>
@@ -243,9 +350,17 @@ export function TwentyFourHourTrendChart() {
 
           {/* Time Range Info */}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span>Last 24 hours</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>Last 24 hours</span>
+              </div>
+              {chartData.length > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  <span>Live data from {chartData.length} sensors</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">

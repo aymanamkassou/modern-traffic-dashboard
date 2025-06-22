@@ -126,40 +126,7 @@ function QuickActions() {
   )
 }
 
-// System Status Banner
-function SystemStatusBanner() {
-  return (
-    <Card className="border-success/20 bg-success/5">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-              <span className="text-sm font-medium">System Operational</span>
-            </div>
-            <Badge variant="outline" className="text-xs border-success/30 text-success-foreground">
-              All Services Online
-            </Badge>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Monitor className="h-3 w-3" />
-              <span>98.7% Uptime</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Zap className="h-3 w-3" />
-              <span>142ms Avg Response</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Activity className="h-3 w-3" />
-              <span>Real-time Data</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+
 
 // Main Overview Page
 export default function OverviewPage() {
@@ -175,8 +142,6 @@ export default function OverviewPage() {
             badge="Live Dashboard"
           />
           
-          {/* System Status Banner */}
-          <SystemStatusBanner />
         </div>
 
         {/* KPI Grid - Primary Metrics */}
@@ -237,7 +202,13 @@ export default function OverviewPage() {
 
         {/* System Health Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          <SensorHealthOverview />
+        <section className="space-y-6">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">Sensor Health</h2>
+                <Badge variant="outline" className="text-xs">Real-time Events</Badge>
+              </div>
+              <SensorHealthOverview />              
+            </section>
         </div>
 
         {/* Quick Actions Section */}

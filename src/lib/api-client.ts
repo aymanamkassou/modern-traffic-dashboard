@@ -13,7 +13,9 @@ import type {
   TrafficStats,
   VehicleStats,
   SensorMapResponse,
-  StreamEvent
+  StreamEvent,
+  HistoricalTrafficData,
+  HistoricalTrafficParams
 } from '@/types/api';
 
 // Base API configuration
@@ -24,6 +26,7 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
   const url = `${API_BASE_URL}${endpoint}`;
   
   try {
+    console.log(`🌐 API Request: ${url}`);
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -32,9 +35,11 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
       ...options,
     });
 
+    console.log(`📡 API Response: ${url} - Status: ${response.status}`);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`API Error:`, {
+      console.error(`❌ API Error:`, {
         url,
         status: response.status,
         statusText: response.statusText,
@@ -43,9 +48,11 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
       throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log(`✅ API Success: ${url} - Data length:`, Array.isArray(data) ? data.length : 'Not array');
+    return data;
   } catch (error) {
-    console.error(`API request failed for ${endpoint}:`, error);
+    console.error(`💥 API request failed for ${endpoint}:`, error);
     throw error;
   }
 }
@@ -170,6 +177,15 @@ export function useIntersectionVehicles(intersectionId: string, timeWindow: numb
     queryFn: () => apiRequest(`/api/vehicles/intersection/${intersectionId}?timeWindow=${timeWindow}`),
     enabled: !!intersectionId,
     refetchInterval: 30000,
+  });
+}
+
+export function useVehicleSpecifications() {
+  return useQuery({
+    queryKey: [...queryKeys.vehicles.all, 'specifications'],
+    queryFn: () => apiRequest('/api/vehicles/specifications'),
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours - specifications don't change often
+    gcTime: 24 * 60 * 60 * 1000,
   });
 }
 
@@ -319,22 +335,31 @@ export function useRiskHeatmap() {
 }
 
 // Historical Data Hooks
-export function useHistoricalTraffic(params: { aggregation?: string; start?: string; end?: string } = {}) {
+export function useHistoricalTraffic(params: HistoricalTrafficParams = {}) {
+  // Set default parameters for 24-hour window if not provided
+  const defaultParams: HistoricalTrafficParams = {
+    aggregation: 'hour',
+    // Don't set default start/end - let the backend handle it
+    ...params
+  };
+
   return useQuery({
-    queryKey: queryKeys.historical.traffic(params),
+    queryKey: queryKeys.historical.traffic(defaultParams),
     queryFn: () => {
       const queryString = new URLSearchParams(
-        Object.entries(params).reduce((acc, [key, value]) => {
+        Object.entries(defaultParams).reduce((acc, [key, value]) => {
           if (value !== undefined && value !== null) {
             acc[key] = String(value);
           }
           return acc;
         }, {} as Record<string, string>)
       ).toString();
-      return apiRequest(`/api/historical/traffic?${queryString}`);
+      return apiRequest<HistoricalTrafficData[]>(`/api/historical/traffic?${queryString}`);
     },
     refetchInterval: 300000, // Refresh every 5 minutes
     staleTime: 120000,
+    retry: 3,
+    retryDelay: 1000,
   });
 }
 

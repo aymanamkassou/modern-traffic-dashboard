@@ -195,57 +195,6 @@ export function IntersectionSelector({ value, onChange, className }: Intersectio
           </div>
         </CollapsibleContent>
       </Collapsible>
-
-      {selectedIntersection && (
-        <div className="p-3 bg-muted/50 rounded-lg space-y-2 animate-fade-in-up">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Selected Intersection</span>
-            {selectedIntersection.coordinated_light_status && (
-              <Badge variant="secondary">
-                {selectedIntersection.coordinated_light_status}
-              </Badge>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {selectedIntersection.total_intersection_vehicles !== undefined && (
-              <div>
-                <span className="text-muted-foreground">Total Vehicles:</span>
-                <span className="ml-2 font-mono">
-                  {selectedIntersection.total_intersection_vehicles}
-                </span>
-              </div>
-            )}
-            
-            {selectedIntersection.average_wait_time !== undefined && (
-              <div>
-                <span className="text-muted-foreground">Avg Wait Time:</span>
-                <span className="ml-2 font-mono">
-                  {selectedIntersection.average_wait_time}s
-                </span>
-              </div>
-            )}
-            
-            {selectedIntersection.intersection_efficiency !== undefined && (
-              <div>
-                <span className="text-muted-foreground">Efficiency:</span>
-                <span className="ml-2 font-mono">
-                  {selectedIntersection.intersection_efficiency}%
-                </span>
-              </div>
-            )}
-            
-            {selectedIntersection.phase_time_remaining !== undefined && (
-              <div>
-                <span className="text-muted-foreground">Phase Remaining:</span>
-                <span className="ml-2 font-mono">
-                  {selectedIntersection.phase_time_remaining}s
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 } 

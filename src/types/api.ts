@@ -106,7 +106,6 @@ export interface VehicleRecord {
 }
 
 export interface VehicleStats {
-  total_vehicles: number; // Add this for backwards compatibility
   overall_stats: {
     total_vehicles: number;
     enhanced_records: number;
@@ -126,14 +125,24 @@ export interface VehicleStats {
     avg_speed: number;
     avg_length: number;
   }[];
+  intersection_analysis?: {
+    intersection_id: string;
+    direction_breakdown: {
+      direction: string;
+      count: number;
+      avg_speed: number;
+      unique_vehicles: number;
+    }[];
+    total_intersection_vehicles: number;
+  }[];
   status_analysis: {
     total_faults: number;
     wrong_way_incidents: number;
     queue_detections: number;
     low_voltage_alerts: number;
   };
-  // Add actual API response structure
-  overallStats: {
+  // Add actual API response structure for backwards compatibility
+  overallStats?: {
     _id: null;
     totalVehicles: number;
     avgSpeed: number;
@@ -148,7 +157,7 @@ export interface VehicleStats {
     enhancedRecords: number;
     enhancementRate: number;
   };
-  vehicleClassStats: {
+  vehicleClassStats?: {
     _id: string;
     count: number;
     avgSpeed: number;
@@ -160,23 +169,29 @@ export interface VehicleStats {
     sensorDirections: any[];
     enhancedLengthRange: string;
   }[];
-  timeDistribution: {
-    hour: number;
-    count: number;
-    avgSpeed: number;
-    avgLength: number;
-    uniqueVehicleClasses: string[];
-    weatherConditions: any[];
-  }[];
-  enhancedAnalytics: {
-    weatherCorrelation: any[];
-    intersectionStats: any[];
-    dataSourceBreakdown: {
-      total: number;
-      enhanced: number;
-      legacy: number;
-      enhancement_rate: number;
-    };
+}
+
+export interface VehicleSpecifications {
+  enhanced_vehicle_lengths: {
+    passenger_car: string;
+    suv: string;
+    pickup_truck: string;
+    motorcycle: string;
+    bus: string;
+    semi_truck: string;
+    delivery_van: string;
+  };
+  status_byte_decoding: {
+    bit_2: string;
+    bit_3: string;
+    bit_4: string;
+    bit_5: string;
+  };
+  vehicle_classes: string[];
+  integration_info: {
+    source: string;
+    version: string;
+    features: string[];
   };
 }
 
@@ -282,4 +297,25 @@ export interface StreamEvent {
   data: any;
   timestamp: string;
   enhanced?: boolean;
+}
+
+// Historical Data Types
+export interface HistoricalTrafficData {
+  timestamp: string;
+  density: number;
+  speed: number;
+  volume?: number;
+  sensor_id?: string;
+  location_id?: string;
+  congestion_level?: string;
+  weather_conditions?: string;
+  vehicle_types?: Record<string, number>;
+}
+
+export interface HistoricalTrafficParams {
+  start?: string;
+  end?: string;
+  aggregation?: 'hour' | 'day' | 'week' | 'month';
+  intersection_id?: string;
+  sensor_id?: string;
 } 
