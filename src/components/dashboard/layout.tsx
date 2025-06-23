@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { NotificationCenter } from './notification-center'
 import { Menu, Search, User } from 'lucide-react'
 import { ThemeToggle } from '../ui/theme-toggle'
+import { useRouter } from 'next/navigation'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -18,7 +19,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Get alert count for sidebar badge
   const { data: alertData } = useAlertCount({ resolved: false })
   const alertCount = (alertData as any)?.count || 0
-
+  const route = useRouter()
   return (
     <SidebarProvider>
       <AppSidebar alertCount={alertCount} />
@@ -55,7 +56,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className={`flex-1 p-6`}>
           {children}
         </main>
 

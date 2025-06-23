@@ -1,10 +1,12 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { AnimatedList } from '@/components/ui/animated-list'
 import { useVehicleSpecifications } from '@/lib/api-client'
 import { 
   Car, 
@@ -21,10 +23,11 @@ import {
   Navigation,
   Users,
   Zap,
-  RefreshCw
+  RefreshCw,
+  BookOpen,
+  Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
 
 // Vehicle specifications data
 const vehicleSpecs = {
@@ -128,7 +131,7 @@ const vehicleSpecs = {
   }
 }
 
-// Status byte definitions
+// Status byte definitions with semantic colors
 const statusDefinitions = {
   hardware_fault: {
     label: 'Hardware Fault',
@@ -136,7 +139,6 @@ const statusDefinitions = {
     bit_position: 0,
     description: 'Indicates sensor hardware malfunction or communication error',
     severity: 'critical',
-    color: 'text-red-500',
     implications: [
       'Sensor data may be unreliable',
       'Requires immediate maintenance',
@@ -156,7 +158,6 @@ const statusDefinitions = {
     bit_position: 1,
     description: 'Power supply voltage below operational threshold',
     severity: 'warning',
-    color: 'text-orange-500',
     implications: [
       'Reduced sensor performance',
       'Potential data loss',
@@ -176,7 +177,6 @@ const statusDefinitions = {
     bit_position: 2,
     description: 'Vehicle detected traveling against traffic flow direction',
     severity: 'critical',
-    color: 'text-red-500',
     implications: [
       'Immediate safety hazard',
       'Potential for accidents',
@@ -196,7 +196,6 @@ const statusDefinitions = {
     bit_position: 3,
     description: 'Traffic queue or congestion formation identified',
     severity: 'info',
-    color: 'text-blue-500',
     implications: [
       'Traffic flow reduction',
       'Increased travel times',
@@ -212,124 +211,197 @@ const statusDefinitions = {
   }
 }
 
-// Vehicle Specification Card Component
-function VehicleSpecCard({ type, spec }: { type: string; spec: any }) {
+// Vehicle Specification Card Component with animations
+function VehicleSpecCard({ type, spec, index }: { type: string; spec: any; index: number }) {
   const [isOpen, setIsOpen] = useState(false)
   const Icon = spec.icon
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-between p-4 h-auto">
-          <div className="flex items-center gap-3">
-            <Icon className="h-5 w-5" />
-            <div className="text-left">
-              <div className="font-medium">{spec.label}</div>
-              <div className="text-sm text-muted-foreground">{spec.description}</div>
-            </div>
-          </div>
-          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-4 pb-4">
-        <div className="space-y-4 pt-2 border-t">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm font-medium flex items-center gap-1">
-                <Ruler className="h-3 w-3" />
-                Typical Length
+    <div 
+      className="animate-fade-in-up"
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-between p-4 h-auto hover:bg-muted/50 transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" />
               </div>
-              <div className="text-sm text-muted-foreground">{spec.typical_length}</div>
-            </div>
-            <div>
-              <div className="text-sm font-medium flex items-center gap-1">
-                <Gauge className="h-3 w-3" />
-                Typical Speed
+              <div className="text-left">
+                <div className="font-medium">{spec.label}</div>
+                <div className="text-sm text-muted-foreground">{spec.description}</div>
               </div>
-              <div className="text-sm text-muted-foreground">{spec.typical_speed}</div>
+            </div>
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+            ) : (
+              <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-4 pb-4 animate-fade-in-up">
+          <div className="space-y-4 pt-2 border-t">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <div className="text-sm font-medium flex items-center gap-1">
+                  <Ruler className="h-3 w-3 text-muted-foreground" />
+                  Typical Length
+                </div>
+                <div className="text-sm text-muted-foreground font-mono">{spec.typical_length}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm font-medium flex items-center gap-1">
+                  <Gauge className="h-3 w-3 text-muted-foreground" />
+                  Typical Speed
+                </div>
+                <div className="text-sm text-muted-foreground font-mono">{spec.typical_speed}</div>
+              </div>
+            </div>
+            
+            <div>
+              <div className="text-sm font-medium mb-2">Characteristics</div>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {spec.characteristics.map((char: string, index: number) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-primary mt-2 flex-shrink-0" />
+                    {char}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <div className="text-sm font-medium mb-1 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Detection Notes
+              </div>
+              <div className="text-sm text-muted-foreground">{spec.detection_notes}</div>
             </div>
           </div>
-          
-          <div>
-            <div className="text-sm font-medium mb-2">Characteristics</div>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              {spec.characteristics.map((char: string, index: number) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0" />
-                  {char}
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="bg-muted/50 p-3 rounded-lg">
-            <div className="text-sm font-medium mb-1">Detection Notes</div>
-            <div className="text-sm text-muted-foreground">{spec.detection_notes}</div>
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   )
 }
 
-// Status Definition Card Component
-function StatusDefinitionCard({ type, definition }: { type: string; definition: any }) {
+// Status Definition Card Component with animations
+function StatusDefinitionCard({ type, definition, index }: { type: string; definition: any; index: number }) {
   const [isOpen, setIsOpen] = useState(false)
   const Icon = definition.icon
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-between p-4 h-auto">
-          <div className="flex items-center gap-3">
-            <Icon className={cn("h-5 w-5", definition.color)} />
-            <div className="text-left">
-              <div className="font-medium flex items-center gap-2">
-                {definition.label}
-                <Badge variant={
-                  definition.severity === 'critical' ? 'destructive' :
-                  definition.severity === 'warning' ? 'secondary' :
-                  'outline'
-                }>
-                  Bit {definition.bit_position}
-                </Badge>
+    <div 
+      className="animate-fade-in-up"
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-between p-4 h-auto hover:bg-muted/50 transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "p-2 rounded-lg",
+                definition.severity === 'critical' && "bg-destructive/10",
+                definition.severity === 'warning' && "bg-warning/10",
+                definition.severity === 'info' && "bg-primary/10"
+              )}>
+                <Icon className={cn(
+                  "h-5 w-5",
+                  definition.severity === 'critical' && "text-destructive",
+                  definition.severity === 'warning' && "text-warning",
+                  definition.severity === 'info' && "text-primary"
+                )} />
               </div>
-              <div className="text-sm text-muted-foreground">{definition.description}</div>
+              <div className="text-left">
+                <div className="font-medium flex items-center gap-2">
+                  {definition.label}
+                  <Badge 
+                    variant={
+                      definition.severity === 'critical' ? 'destructive' :
+                      definition.severity === 'warning' ? 'secondary' :
+                      'outline'
+                    }
+                    className="text-xs"
+                  >
+                    Bit {definition.bit_position}
+                  </Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">{definition.description}</div>
+              </div>
+            </div>
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+            ) : (
+              <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-4 pb-4 animate-fade-in-up">
+          <div className="space-y-4 pt-2 border-t">
+            <div>
+              <div className="text-sm font-medium mb-2 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Implications
+              </div>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {definition.implications.map((implication: string, index: number) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-destructive/50 mt-2 flex-shrink-0" />
+                    {implication}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <div className="text-sm font-medium mb-2 flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                Troubleshooting Steps
+              </div>
+              <ol className="text-sm text-muted-foreground space-y-1">
+                {definition.troubleshooting.map((step: string, index: number) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span className="text-xs bg-primary/20 text-primary rounded-full w-4 h-4 flex items-center justify-center mt-0.5 flex-shrink-0 font-medium">
+                      {index + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
-          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-4 pb-4">
-        <div className="space-y-4 pt-2 border-t">
-          <div>
-            <div className="text-sm font-medium mb-2">Implications</div>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              {definition.implications.map((implication: string, index: number) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0" />
-                  {implication}
-                </li>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  )
+}
+
+// Loading skeleton component
+function SpecificationSkeleton() {
+  return (
+    <div className="space-y-6">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i} className="animate-pulse">
+          <CardHeader>
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-4 w-2/3" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, j) => (
+                <Skeleton key={j} className="h-16 w-full" />
               ))}
-            </ul>
-          </div>
-          
-          <div>
-            <div className="text-sm font-medium mb-2">Troubleshooting Steps</div>
-            <ol className="text-sm text-muted-foreground space-y-1">
-              {definition.troubleshooting.map((step: string, index: number) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span className="text-xs bg-muted text-muted-foreground rounded-full w-4 h-4 flex items-center justify-center mt-0.5 flex-shrink-0">
-                    {index + 1}
-                  </span>
-                  {step}
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }
 
@@ -338,32 +410,17 @@ export function VehicleSpecsReference() {
   const { data: specifications, isLoading, error, refetch } = useVehicleSpecifications()
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="h-6 bg-muted rounded w-1/3" />
-              <div className="h-4 bg-muted rounded w-2/3" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Array.from({ length: 5 }).map((_, j) => (
-                  <div key={j} className="h-16 bg-muted rounded" />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
+    return <SpecificationSkeleton />
   }
 
   if (error) {
     return (
-      <Card className="border-red-500/50">
+      <Card className="border-destructive/50 animate-fade-in-up">
         <CardHeader>
-          <CardTitle className="text-red-500">Error Loading Vehicle Specifications</CardTitle>
+          <CardTitle className="text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Error Loading Vehicle Specifications
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
@@ -380,9 +437,12 @@ export function VehicleSpecsReference() {
 
   if (!specifications) {
     return (
-      <Card className="border-yellow-500/50">
+      <Card className="border-warning/50 animate-fade-in-up">
         <CardHeader>
-          <CardTitle className="text-yellow-500">No Specifications Available</CardTitle>
+          <CardTitle className="text-warning flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            No Specifications Available
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -398,7 +458,7 @@ export function VehicleSpecsReference() {
     acc[type] = {
       label: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
       icon: vehicleSpecs[type as keyof typeof vehicleSpecs]?.icon || Car,
-      description: vehicleSpecs[type as keyof typeof vehicleSpecs]?.description || `Enhanced ${type.replace('_', ' ')} detection`,
+      description: vehicleSpecs[type as keyof typeof vehicleSpecs]?.description || `Enhanced ${type.replace(/_/g, ' ')} detection`,
       typical_length: length,
       typical_speed: vehicleSpecs[type as keyof typeof vehicleSpecs]?.typical_speed || '20-80 km/h',
       characteristics: vehicleSpecs[type as keyof typeof vehicleSpecs]?.characteristics || [
@@ -429,110 +489,131 @@ export function VehicleSpecsReference() {
     return acc
   }, {} as any)
 
-  return (
-    <div className="space-y-6">
-      {/* Integration Info */}
-      {specifications.integration_info && (
-        <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/50">
+  // Component list for animated rendering
+  const componentList = [
+    {
+      id: 'integration-info',
+      component: specifications.integration_info && (
+        <Card className="border-success/50 bg-success/5 animate-fade-in-up">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 mb-2">
-              <Zap className="h-4 w-4" />
-              <span className="font-medium">{specifications.integration_info.source} v{specifications.integration_info.version}</span>
+            <div className="flex items-center gap-2 text-sm mb-2">
+              <Zap className="h-4 w-4 text-success" />
+              <span className="font-medium text-success-foreground">
+                {specifications.integration_info.source} v{specifications.integration_info.version}
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {specifications.integration_info.features.map((feature: string, index: number) => (
-                <Badge key={index} variant="outline" className="text-xs">
+                <Badge key={index} variant="outline" className="text-xs border-success/30">
                   {feature}
                 </Badge>
               ))}
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Vehicle Classifications */}
-      <Card className="animate-fade-in-up">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Car className="h-5 w-5" />
-            Vehicle Classifications
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Real-time specifications from the enhanced traffic simulator system
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {Object.entries(apiVehicleSpecs).map(([type, spec]) => (
-            <VehicleSpecCard key={type} type={type} spec={spec} />
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Status Byte Definitions */}
-      <Card className="animate-fade-in-up">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5" />
-            Status Byte Definitions
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Real-time status flag definitions from sensor integration
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {Object.entries(apiStatusDefinitions).map(([type, definition]) => (
-            <StatusDefinitionCard key={type} type={type} definition={definition} />
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Quick Reference */}
-      <div className="grid gap-6 md:grid-cols-2">
+      )
+    },
+    {
+      id: 'vehicle-classifications',
+      component: (
         <Card className="animate-fade-in-up">
           <CardHeader>
-            <CardTitle className="text-lg">Length Reference</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5" />
+              Vehicle Classifications
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Real-time specifications from the enhanced traffic simulator system
+            </p>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              {Object.entries(specifications.enhanced_vehicle_lengths || {}).map(([type, length]) => (
-                <div key={type} className="flex justify-between">
-                  <span>{type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:</span>
-                  <span className="font-mono">{length}</span>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-2">
+            {Object.entries(apiVehicleSpecs).map(([type, spec], index) => (
+              <VehicleSpecCard key={type} type={type} spec={spec} index={index} />
+            ))}
           </CardContent>
         </Card>
-
+      )
+    },
+    {
+      id: 'status-definitions',
+      component: (
         <Card className="animate-fade-in-up">
           <CardHeader>
-            <CardTitle className="text-lg">Status Bit Map</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              Status Byte Definitions
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Real-time status flag definitions from sensor integration
+            </p>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              {Object.entries(specifications.status_byte_decoding || {}).map(([key, description]) => {
-                const bitNum = key.replace('bit_', '')
-                const variant = bitNum === '2' || bitNum === '4' ? 'destructive' :
-                               bitNum === '3' ? 'secondary' : 'outline'
-                return (
-                  <div key={key} className="flex justify-between items-center">
-                    <span>Bit {bitNum}:</span>
-                    <Badge variant={variant} className="text-xs">
-                      {description.replace(/\(0x[0-9A-F]+\)/g, '').trim()}
-                    </Badge>
+          <CardContent className="space-y-2">
+            {Object.entries(apiStatusDefinitions).map(([type, definition], index) => (
+              <StatusDefinitionCard key={type} type={type} definition={definition} index={index} />
+            ))}
+          </CardContent>
+        </Card>
+      )
+    },
+    {
+      id: 'quick-reference',
+      component: (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Ruler className="h-5 w-5" />
+                Length Reference
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                {Object.entries(specifications.enhanced_vehicle_lengths || {}).map(([type, length]) => (
+                  <div key={type} className="flex justify-between items-center py-1">
+                    <span className="capitalize">{type.replace(/_/g, ' ')}:</span>
+                    <span className="font-mono text-muted-foreground">{length}</span>
                   </div>
-                )
-              })}
-            </div>
-            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-              <div className="text-xs text-muted-foreground">
-                Status byte is an 8-bit value where each bit represents a specific condition or flag.
-                Multiple flags can be active simultaneously.
+                ))}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+            </CardContent>
+          </Card>
+
+          <Card className="animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Quick Status Reference
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive" className="text-xs">Critical</Badge>
+                  <span className="text-muted-foreground">Hardware Fault, Wrong Way</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">Warning</Badge>
+                  <span className="text-muted-foreground">Low Voltage</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">Info</Badge>
+                  <span className="text-muted-foreground">Queue Detected</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+  ]
+
+  return (
+    <AnimatedList
+      items={componentList.filter(item => item.component)}
+      renderItem={(item) => item.component}
+      keyExtractor={(item) => item.id}
+      staggerDelay={100}
+      className="space-y-6"
+    />
   )
 } 

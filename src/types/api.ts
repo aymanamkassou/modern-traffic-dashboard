@@ -106,7 +106,54 @@ export interface VehicleRecord {
 }
 
 export interface VehicleStats {
-  overall_stats: {
+  // Primary API response structure (actual response from http://localhost:3001/api/vehicles/stats)
+  overallStats: {
+    _id: null;
+    totalVehicles: number;
+    avgSpeed: number;
+    maxSpeed: number;
+    minSpeed: number;
+    avgLength: number;
+    maxLength: number;
+    minLength: number;
+    totalWithStatus: number;
+    uniqueIntersections: any[];
+    uniqueSensorDirections: any[];
+    enhancedRecords: number;
+    enhancementRate: number;
+  };
+  vehicleClassStats: {
+    _id: string;
+    count: number;
+    avgSpeed: number;
+    avgLength: number;
+    avgOccupancy: number;
+    avgTimeGap: number;
+    intersections: any[];
+    weatherConditions: any[];
+    sensorDirections: any[];
+    enhancedLengthRange: string;
+  }[];
+  timeDistribution: {
+    hour: number;
+    count: number;
+    avgSpeed: number;
+    avgLength: number;
+    uniqueVehicleClasses: string[];
+    weatherConditions: any[];
+  }[];
+  enhancedAnalytics: {
+    weatherCorrelation: any[];
+    intersectionStats: any[];
+    dataSourceBreakdown: {
+      total: number;
+      enhanced: number;
+      legacy: number;
+      enhancement_rate: number;
+    };
+  };
+  // Legacy structure for backwards compatibility
+  overall_stats?: {
     total_vehicles: number;
     enhanced_records: number;
     enhancement_rate: number;
@@ -118,7 +165,7 @@ export interface VehicleStats {
       end: string;
     };
   };
-  vehicle_class_breakdown: {
+  vehicle_class_breakdown?: {
     class: string;
     count: number;
     percentage: number;
@@ -135,40 +182,12 @@ export interface VehicleStats {
     }[];
     total_intersection_vehicles: number;
   }[];
-  status_analysis: {
+  status_analysis?: {
     total_faults: number;
     wrong_way_incidents: number;
     queue_detections: number;
     low_voltage_alerts: number;
   };
-  // Add actual API response structure for backwards compatibility
-  overallStats?: {
-    _id: null;
-    totalVehicles: number;
-    avgSpeed: number;
-    maxSpeed: number;
-    minSpeed: number;
-    avgLength: number;
-    maxLength: number;
-    minLength: number;
-    totalWithStatus: number;
-    uniqueIntersections: any[];
-    uniqueSensorDirections: any[];
-    enhancedRecords: number;
-    enhancementRate: number;
-  };
-  vehicleClassStats?: {
-    _id: string;
-    count: number;
-    avgSpeed: number;
-    avgLength: number;
-    avgOccupancy: number;
-    avgTimeGap: number;
-    intersections: any[];
-    weatherConditions: any[];
-    sensorDirections: any[];
-    enhancedLengthRange: string;
-  }[];
 }
 
 export interface VehicleSpecifications {
@@ -318,4 +337,147 @@ export interface HistoricalTrafficParams {
   aggregation?: 'hour' | 'day' | 'week' | 'month';
   intersection_id?: string;
   sensor_id?: string;
+}
+
+// Risk Analysis Types
+export interface RiskAnalysisResponse {
+  risk_analysis: {
+    overall_risk: {
+      score: number;
+      level: 'critical' | 'high' | 'medium' | 'low';
+      timestamp: string;
+    };
+    risk_breakdown: {
+      traffic: number;
+      intersection: number;
+      environment: number;
+      incidents: number;
+    };
+    risk_factors: RiskFactor[];
+    total_factors: number;
+  };
+  current_conditions: {
+    traffic_data: TrafficData | null;
+    intersection_data: IntersectionData | null;
+    recent_alerts: {
+      count: number;
+      time_window_minutes: number;
+      high_severity_count: number;
+    };
+  };
+  recommendations: Recommendation[];
+  historical_analysis: {
+    patterns: any[];
+    trends: any;
+    recommendations: any[];
+  };
+  metadata: {
+    analysis_timestamp: string;
+    data_sources: {
+      traffic_collection: string;
+      intersection_collection: string;
+      alerts_collection: string;
+    };
+    filters_applied: {
+      intersection_id?: string;
+      sensor_id?: string;
+      location_id?: string;
+    };
+  };
+}
+
+export interface RiskFactor {
+  category: 'traffic' | 'intersection' | 'environment' | 'incidents';
+  factor: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  value: number | string;
+  description: string;
+}
+
+export interface Recommendation {
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  action: string;
+  description: string;
+  factor?: string;
+}
+
+// Risk Heatmap Types
+export interface RiskHeatmapResponse {
+  heatmap_data: RiskHeatmapLocation[];
+  summary: {
+    total_locations: number;
+    risk_distribution: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+    average_risk_score: number;
+    highest_risk_location: RiskHeatmapLocation;
+  };
+  parameters: {
+    time_window_minutes: number;
+    risk_score_range: {
+      min: number;
+      max: number;
+    };
+    include_risk_factors: boolean;
+  };
+  metadata: {
+    generated_at: string;
+    data_sources: {
+      traffic_locations: number;
+      intersection_locations: number;
+      alert_locations: number;
+    };
+  };
+}
+
+export interface RiskHeatmapLocation {
+  location: {
+    intersection_id: string;
+    sensor_id: string;
+    location_id: string;
+    coordinates: {
+      lat: number;
+      lng: number;
+    };
+  };
+  risk_score: number;
+  risk_level: 'critical' | 'high' | 'medium' | 'low';
+  risk_breakdown: {
+    traffic: number;
+    intersection: number;
+    environment: number;
+    incidents: number;
+  };
+  stats: {
+    traffic: {
+      avg_speed: number;
+      avg_density: number;
+      incident_count: number;
+      data_points: number;
+    };
+    intersection: {
+      avg_wait_time: number;
+      total_collisions: number;
+      risky_behavior_incidents: number;
+      data_points: number;
+    };
+    alerts: {
+      alert_count: number;
+      high_severity_count: number;
+      latest_alert: any;
+    };
+  };
+  last_updated: string;
+}
+
+// Congestion Heatmap Types
+export interface CongestionHeatmapData {
+  id: string; // Day name (Sunday, Monday, etc.)
+  data: {
+    x: string; // Hour (0-23)
+    y: number; // Congestion level
+  }[];
 } 

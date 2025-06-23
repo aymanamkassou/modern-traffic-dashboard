@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useVehicleData } from '@/lib/api-client'
-import { useServerSentEvents } from '@/hooks/use-server-sent-events'
+import { useServerSentEvents, SSEEvent } from '@/hooks/use-server-sent-events'
+import { AnimatedList } from '@/components/ui/animated-list'
 import { 
   Car, 
   Truck, 
@@ -26,10 +28,10 @@ import {
   Wifi,
   WifiOff,
   Play,
-  Pause
+  Pause,
+  Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { isVehicleData, type VehicleStreamData } from '@/types/sse-events'
 import type { VehicleRecord } from '@/types/api'
 
 // Vehicle class icons mapping
@@ -43,47 +45,134 @@ const vehicleIcons = {
   delivery_van: Truck,
 } as const
 
-// Status badge variants
-const getStatusBadgeVariant = (status: any) => {
-  if (status.hardware_fault || status.low_voltage) return 'destructive'
-  if (status.wrong_way_driver) return 'destructive'
-  if (status.queue_detected) return 'secondary'
-  return 'outline'
+// Helper function to detect vehicle data
+const isVehicleData = (data: any): boolean => {
+  return data && (
+    data.vehicle_id !== undefined || 
+    data.id !== undefined ||
+    data.vehicle_class !== undefined || 
+    (data.speed_kmh !== undefined && data.length_dm !== undefined)
+  )
 }
 
-// Connection Status Indicator
-function ConnectionIndicator({ isConnected, error }: { isConnected: boolean; error: string | null }) {
-  if (error) {
-    return (
-      <div className="flex items-center gap-1 text-xs text-red-500">
-        <WifiOff className="h-3 w-3" />
-        <span>Offline</span>
-      </div>
-    )
+// Vehicle data type for SSE
+interface VehicleStreamData {
+  id: string
+  sensor_id: string
+  timestamp: string
+  vehicle_class: string
+  speed_kmh: number
+  length_dm: number
+  location_id?: string
+  intersection_id?: string
+  sensor_direction?: string
+  status?: number
+  decoded_status?: {
+    hardware_fault: boolean
+    low_voltage: boolean
+    wrong_way_driver: boolean
+    queue_detected: boolean
   }
-  
-  if (isConnected) {
+}
+
+// Connection Status Badge
+function ConnectionBadge({ isConnected, isPaused }: { isConnected: boolean; isPaused: boolean }) {
+  if (isPaused) {
     return (
-      <div className="flex items-center gap-1 text-xs text-green-500">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <span>Live</span>
-      </div>
+      <Badge variant="secondary" className="text-xs">
+        <Pause className="h-3 w-3 mr-1" />
+        Paused
+      </Badge>
     )
   }
   
   return (
-    <div className="flex items-center gap-1 text-xs text-yellow-500">
-      <Wifi className="h-3 w-3" />
-      <span>Connecting...</span>
-    </div>
+    <Badge 
+      variant={isConnected ? "default" : "secondary"} 
+      className={cn(
+        "text-xs transition-all duration-300",
+        isConnected && "animate-pulse"
+      )}
+    >
+      {isConnected ? (
+        <>
+          <Wifi className="h-3 w-3 mr-1" />
+          Live
+        </>
+      ) : (
+        <>
+          <WifiOff className="h-3 w-3 mr-1" />
+          Offline
+        </>
+      )}
+    </Badge>
   )
 }
 
+// Status Badge Component
+function StatusBadge({ status }: { status: any }) {
+  if (!status) return null
+
+  const badges = []
+  
+  if (status.hardware_fault) {
+    badges.push(
+      <Badge key="hw" variant="destructive" className="text-xs">
+        HW Fault
+      </Badge>
+    )
+  }
+  
+  if (status.low_voltage) {
+    badges.push(
+      <Badge key="lv" variant="destructive" className="text-xs">
+        Low Voltage
+      </Badge>
+    )
+  }
+  
+  if (status.wrong_way_driver) {
+    badges.push(
+      <Badge key="ww" variant="destructive" className="text-xs">
+        <AlertTriangle className="h-3 w-3 mr-1" />
+        Wrong Way
+      </Badge>
+    )
+  }
+  
+  if (status.queue_detected) {
+    badges.push(
+      <Badge key="q" variant="secondary" className="text-xs">
+        Queue
+      </Badge>
+    )
+  }
+  
+  if (badges.length === 0) {
+    badges.push(
+      <Badge key="ok" variant="outline" className="text-xs">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        Normal
+      </Badge>
+    )
+  }
+  
+  return <div className="flex flex-wrap gap-1">{badges}</div>
+}
+
 // Vehicle Row Component
-function VehicleRow({ vehicle, isNew }: { vehicle: VehicleRecord | VehicleStreamData; isNew?: boolean }) {
+function VehicleRow({ 
+  vehicle, 
+  isNew,
+  index 
+}: { 
+  vehicle: VehicleRecord | VehicleStreamData
+  isNew?: boolean
+  index: number
+}) {
   const Icon = vehicleIcons[vehicle.vehicle_class as keyof typeof vehicleIcons] || Car
   
-  // Handle both API response format and SSE stream format
+  // Normalize vehicle data
   const vehicleData = {
     id: 'vehicle_id' in vehicle ? vehicle.vehicle_id : vehicle.id,
     sensor_id: vehicle.sensor_id,
@@ -94,7 +183,7 @@ function VehicleRow({ vehicle, isNew }: { vehicle: VehicleRecord | VehicleStream
     location_id: 'location_id' in vehicle ? vehicle.location_id : '',
     intersection_id: 'intersection_id' in vehicle ? vehicle.intersection_id : undefined,
     sensor_direction: 'sensor_direction' in vehicle ? vehicle.sensor_direction : undefined,
-    decoded_status: 'decoded_status' in vehicle ? vehicle.decoded_status : {
+    decoded_status: 'decoded_status' in vehicle ? vehicle.decoded_status : vehicle.decoded_status || {
       hardware_fault: false,
       low_voltage: false,
       wrong_way_driver: false,
@@ -103,79 +192,64 @@ function VehicleRow({ vehicle, isNew }: { vehicle: VehicleRecord | VehicleStream
   }
 
   return (
-    <TableRow className={cn(
-      "transition-all duration-300",
-      isNew && "bg-green-50 dark:bg-green-950/20 animate-fade-in-up"
-    )}>
+    <TableRow 
+      className={cn(
+        "transition-all duration-500 hover:bg-muted/50",
+        isNew && "bg-green-50 dark:bg-green-950/20 animate-pulse",
+        "animate-fade-in-up"
+      )}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
       <TableCell className="font-mono text-xs">
         {vehicleData.id.slice(-8)}
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4" />
-          <span className="text-sm capitalize">
-            {vehicleData.vehicle_class.replace('_', ' ')}
+          <div className={cn(
+            "p-1 rounded",
+            isNew && "bg-primary/10"
+          )}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <span className="text-sm font-medium capitalize">
+            {vehicleData.vehicle_class.replace(/_/g, ' ')}
           </span>
         </div>
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1">
           <Gauge className="h-3 w-3 text-muted-foreground" />
-          <span className="text-sm">{vehicleData.speed.toFixed(1)} km/h</span>
+          <span className="text-sm font-mono">{vehicleData.speed.toFixed(1)} km/h</span>
         </div>
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1">
           <Ruler className="h-3 w-3 text-muted-foreground" />
-          <span className="text-sm">{vehicleData.length} dm</span>
+          <span className="text-sm font-mono">{vehicleData.length} dm</span>
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs">
+      <TableCell className="font-mono text-xs text-muted-foreground">
         {vehicleData.sensor_id}
       </TableCell>
       <TableCell>
         {vehicleData.intersection_id && (
           <div className="flex items-center gap-1">
             <MapPin className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs">{vehicleData.intersection_id}</span>
+            <span className="text-xs truncate max-w-[120px]" title={vehicleData.intersection_id}>
+              {vehicleData.intersection_id}
+            </span>
           </div>
         )}
       </TableCell>
       <TableCell>
         {vehicleData.sensor_direction && (
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs font-medium">
             {vehicleData.sensor_direction.toUpperCase()}
           </Badge>
         )}
       </TableCell>
       <TableCell>
-        <div className="flex flex-wrap gap-1">
-          {vehicleData.decoded_status.hardware_fault && (
-            <Badge variant="destructive" className="text-xs">
-              HW Fault
-            </Badge>
-          )}
-          {vehicleData.decoded_status.low_voltage && (
-            <Badge variant="destructive" className="text-xs">
-              Low Voltage
-            </Badge>
-          )}
-          {vehicleData.decoded_status.wrong_way_driver && (
-            <Badge variant="destructive" className="text-xs">
-              Wrong Way
-            </Badge>
-          )}
-          {vehicleData.decoded_status.queue_detected && (
-            <Badge variant="secondary" className="text-xs">
-              Queue
-            </Badge>
-          )}
-          {!Object.values(vehicleData.decoded_status).some(Boolean) && (
-            <Badge variant="outline" className="text-xs">
-              Normal
-            </Badge>
-          )}
-        </div>
+        <StatusBadge status={vehicleData.decoded_status} />
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
@@ -184,6 +258,23 @@ function VehicleRow({ vehicle, isNew }: { vehicle: VehicleRecord | VehicleStream
         </div>
       </TableCell>
     </TableRow>
+  )
+}
+
+// Loading skeleton for table
+function TableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <TableRow key={i}>
+          {Array.from({ length: 9 }).map((_, j) => (
+            <TableCell key={j}>
+              <Skeleton className="h-4 w-full" />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
   )
 }
 
@@ -204,14 +295,37 @@ export function LiveVehicleLog() {
   })
 
   // SSE connection for real-time updates
-  const { isConnected, error: sseError } = useServerSentEvents(
-    isLiveMode ? 'http://localhost:3001/api/vehicles/stream' : null,
+  const { 
+    isConnected, 
+    error: sseError,
+    events
+  } = useServerSentEvents(
+    isLiveMode 
+      ? process.env.NEXT_PUBLIC_API_BASE_URL 
+        ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/vehicles/stream`
+        : 'http://localhost:3001/api/vehicles/stream'
+      : null,
     {
       autoConnect: true,
       maxEvents: 100,
-      onEvent: (event) => {
-        if (event.type === 'message' && isVehicleData(event.data)) {
-          const vehicleStreamData = event.data
+      onEvent: (event: SSEEvent) => {
+        // Handle both typed events and generic 'message' events
+        if (event.type === 'VEHICLE' || (event.type === 'message' && isVehicleData(event.data))) {
+          console.log('🚗 Live vehicle detected:', event.data)
+          
+          const vehicleStreamData: VehicleStreamData = {
+            id: event.data.vehicle_id || event.data.id || `vehicle-${Date.now()}`,
+            sensor_id: event.data.sensor_id,
+            timestamp: event.data.timestamp,
+            vehicle_class: event.data.vehicle_class,
+            speed_kmh: event.data.speed_kmh,
+            length_dm: event.data.length_dm,
+            location_id: event.data.location_id,
+            intersection_id: event.data.intersection_id,
+            sensor_direction: event.data.sensor_direction,
+            status: event.data.status,
+            decoded_status: event.data.decoded_status
+          }
           
           setLiveVehicles(prev => {
             const newVehicles = [vehicleStreamData, ...prev.slice(0, 49)]
@@ -237,26 +351,25 @@ export function LiveVehicleLog() {
 
   // Combine API data and live data
   const allVehicles = useMemo(() => {
-    // Handle both direct array and response object formats
     const apiVehicles = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.data || [])
     
     if (isLiveMode && liveVehicles.length > 0) {
-      // Convert live vehicles to match API format and combine
+      // Convert live vehicles to match API format
       const convertedLiveVehicles = liveVehicles.map((lv: VehicleStreamData) => ({
         _id: lv.id,
         vehicle_id: lv.id,
         sensor_id: lv.sensor_id,
         timestamp: lv.timestamp,
-        location_id: '',
+        location_id: lv.location_id || '',
         location_x: 0,
         location_y: 0,
         vehicle_class: lv.vehicle_class,
         length_dm: lv.length_dm,
         speed_kmh: lv.speed_kmh,
-        status: 0,
-        intersection_id: undefined,
-        sensor_direction: undefined,
-        decoded_status: {
+        status: lv.status || 0,
+        intersection_id: lv.intersection_id,
+        sensor_direction: lv.sensor_direction,
+        decoded_status: lv.decoded_status || {
           hardware_fault: false,
           low_voltage: false,
           wrong_way_driver: false,
@@ -287,8 +400,8 @@ export function LiveVehicleLog() {
         (statusFilter === 'wrong_way' && vehicle.decoded_status?.wrong_way_driver) ||
         (statusFilter === 'queue' && vehicle.decoded_status?.queue_detected)
 
-             const matchesIntersection = intersectionFilter === 'all' || 
-         (vehicle.intersection_id && vehicle.intersection_id === intersectionFilter)
+      const matchesIntersection = intersectionFilter === 'all' || 
+        (vehicle.intersection_id && vehicle.intersection_id === intersectionFilter)
 
       return matchesSearch && matchesClass && matchesStatus && matchesIntersection
     })
@@ -301,15 +414,22 @@ export function LiveVehicleLog() {
   }, [allVehicles])
 
   const uniqueIntersections = useMemo(() => {
-    const intersections = new Set(allVehicles.map(v => v.intersection_id).filter((id): id is string => Boolean(id)))
+    const intersections = new Set(
+      allVehicles
+        .map(v => v.intersection_id)
+        .filter((id): id is string => Boolean(id))
+    )
     return Array.from(intersections).sort()
   }, [allVehicles])
 
   if (error) {
     return (
-      <Card className="border-red-500/50">
+      <Card className="border-destructive/50 animate-fade-in-up">
         <CardHeader>
-          <CardTitle className="text-red-500">Error Loading Vehicle Data</CardTitle>
+          <CardTitle className="text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Error Loading Vehicle Data
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -328,24 +448,45 @@ export function LiveVehicleLog() {
     <Card className="animate-fade-in-up">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
+          <div className="space-y-1">
             <CardTitle className="flex items-center gap-2">
-              <Car className="h-5 w-5" />
+              <Activity className="h-5 w-5" />
               Live Vehicle Detection Log
+              <ConnectionBadge isConnected={isConnected} isPaused={!isLiveMode} />
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Real-time vehicle detection events with detailed classification and status information
+              Real-time vehicle detection events with detailed classification and anomaly detection
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <ConnectionIndicator isConnected={isConnected} error={sseError} />
             <Button
               variant={isLiveMode ? "default" : "outline"}
               size="sm"
               onClick={() => setIsLiveMode(!isLiveMode)}
+              className="transition-all duration-200"
             >
-              {isLiveMode ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-              {isLiveMode ? 'Pause Live' : 'Resume Live'}
+              {isLiveMode ? (
+                <>
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pause
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Resume
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isLoading}
+            >
+              <RefreshCw className={cn(
+                "h-4 w-4",
+                isLoading && "animate-spin"
+              )} />
             </Button>
           </div>
         </div>
@@ -355,12 +496,12 @@ export function LiveVehicleLog() {
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search vehicles, sensors..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
+                className="pl-9"
               />
             </div>
           </div>
@@ -372,7 +513,7 @@ export function LiveVehicleLog() {
               <SelectItem value="all">All Classes</SelectItem>
               {uniqueClasses.map(cls => (
                 <SelectItem key={cls} value={cls}>
-                  {cls.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                  {cls.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -406,22 +547,29 @@ export function LiveVehicleLog() {
           )}
         </div>
 
-        {/* Stats */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span>Total: {filteredVehicles.length} vehicles</span>
-          {isLiveMode && (
-            <span className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live updates enabled
-            </span>
+        {/* Stats Bar */}
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <span>Total: {filteredVehicles.length} vehicles</span>
+            {isLiveMode && isConnected && (
+              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Receiving live updates
+              </span>
+            )}
+          </div>
+          {events.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {events.length} events received
+            </Badge>
           )}
         </div>
 
         {/* Table */}
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/50">
                 <TableHead className="w-[100px]">Vehicle ID</TableHead>
                 <TableHead>Class</TableHead>
                 <TableHead>Speed</TableHead>
@@ -435,27 +583,23 @@ export function LiveVehicleLog() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 9 }).map((_, j) => (
-                      <TableCell key={j}>
-                        <div className="h-4 bg-muted rounded animate-pulse" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                <TableSkeleton />
               ) : filteredVehicles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    No vehicles found matching the current filters
+                  <TableCell colSpan={9} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Car className="h-8 w-8 opacity-50" />
+                      <p>No vehicles found matching the current filters</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredVehicles.slice(0, 50).map((vehicle) => (
+                filteredVehicles.slice(0, 50).map((vehicle, index) => (
                   <VehicleRow 
                     key={vehicle.vehicle_id || vehicle._id} 
                     vehicle={vehicle}
                     isNew={newVehicleIds.has(vehicle.vehicle_id || vehicle._id)}
+                    index={index}
                   />
                 ))
               )}
@@ -464,7 +608,7 @@ export function LiveVehicleLog() {
         </div>
 
         {filteredVehicles.length > 50 && (
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground py-2">
             Showing first 50 of {filteredVehicles.length} vehicles
           </div>
         )}

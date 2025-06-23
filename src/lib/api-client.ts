@@ -15,7 +15,10 @@ import type {
   SensorMapResponse,
   StreamEvent,
   HistoricalTrafficData,
-  HistoricalTrafficParams
+  HistoricalTrafficParams,
+  RiskAnalysisResponse,
+  RiskHeatmapResponse,
+  CongestionHeatmapData
 } from '@/types/api';
 
 // Base API configuration
@@ -316,19 +319,44 @@ export function useTrafficStream(intersectionId?: string) {
 }
 
 // Risk Analysis Hooks
-export function useRiskAnalysis() {
+export function useRiskAnalysis(intersectionId?: string, params: any = {}) {
+  const queryParams = { ...params };
+  if (intersectionId) {
+    queryParams.intersection_id = intersectionId;
+  }
+
   return useQuery({
-    queryKey: queryKeys.risk.analysis(),
-    queryFn: () => apiRequest('/api/risk/analysis'),
+    queryKey: [...queryKeys.risk.analysis(), queryParams],
+    queryFn: () => {
+      const queryString = new URLSearchParams(
+        Object.entries(queryParams).reduce((acc, [key, value]) => {
+          if (value !== undefined && value !== null) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {} as Record<string, string>)
+      ).toString();
+      return apiRequest<RiskAnalysisResponse>(`/api/risk/analysis?${queryString}`);
+    },
     refetchInterval: 60000, // Refresh every minute
     staleTime: 30000,
   });
 }
 
-export function useRiskHeatmap() {
+export function useRiskHeatmap(params: any = {}) {
   return useQuery({
-    queryKey: queryKeys.risk.heatmap(),
-    queryFn: () => apiRequest('/api/risk/heatmap'),
+    queryKey: [...queryKeys.risk.heatmap(), params],
+    queryFn: () => {
+      const queryString = new URLSearchParams(
+        Object.entries(params).reduce((acc, [key, value]) => {
+          if (value !== undefined && value !== null) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {} as Record<string, string>)
+      ).toString();
+      return apiRequest<RiskHeatmapResponse>(`/api/risk/heatmap?${queryString}`);
+    },
     refetchInterval: 120000, // Refresh every 2 minutes
     staleTime: 60000,
   });
@@ -375,7 +403,7 @@ export function useHistoricalWeather() {
 export function useHistoricalCongestion() {
   return useQuery({
     queryKey: queryKeys.historical.congestion(),
-    queryFn: () => apiRequest('/api/historical/congestion'),
+    queryFn: () => apiRequest<CongestionHeatmapData[]>('/api/historical/congestion'),
     refetchInterval: 300000,
     staleTime: 120000,
   });

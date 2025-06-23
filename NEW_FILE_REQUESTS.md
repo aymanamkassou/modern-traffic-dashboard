@@ -184,38 +184,94 @@
 ✅ **Accessibility**: Proper focus management and semantic HTML
 ✅ **Performance**: Animations maintain smooth performance
 
-## Vehicle Page Implementation
+## Vehicle Page Refactoring Request
 
-### Files Created:
-1. `src/app/vehicles/page.tsx` - Main vehicles page component
-2. `src/components/vehicles/vehicle-stats-dashboard.tsx` - Vehicle statistics dashboard with charts
-3. `src/components/vehicles/live-vehicle-log.tsx` - Real-time vehicle detection log with SSE
-4. `src/components/vehicles/status-anomaly-chart.tsx` - Status anomaly frequency analysis
-5. `src/components/vehicles/vehicle-specs-reference.tsx` - Vehicle specifications reference guide
+### Search Performed:
+1. **Existing Components**: Searched through `/src/components/vehicles/` directory
+   - `vehicle-stats-dashboard.tsx` - Main stats dashboard with charts
+   - `live-vehicle-log.tsx` - Real-time vehicle detection log
+   - `status-anomaly-chart.tsx` - Anomaly detection visualization
+   - `vehicle-specs-reference.tsx` - Vehicle specifications reference
 
-### Search for Duplicate Functionality:
-- **Searched in**: `src/components/dashboard/` - Found KPI grid patterns which were reused
-- **Searched in**: `src/components/ui/` - Found all necessary shadcn components (chart, card, table, etc.)
-- **Searched in**: `src/hooks/` - Found existing SSE hook which was reused
-- **Searched in**: `src/lib/` - Found API client with vehicle functions which were reused
-- **Searched in**: `src/types/` - Found existing vehicle types which were reused
+2. **Design Documentation**: Reviewed all relevant design docs
+   - `docs/DESIGN_PHILOSOPHY.md` - Core design principles
+   - `docs/API_ENDPOINTS.md` - Real API integration specs
+   - `docs/SSE_MESSAGE_EVENT_FIX.md` - SSE implementation fixes
+   - `docs/ANIMATION_GUIDELINES.md` - Animation standards
+   - `docs/DESIGN_COHERENCE_FIXES.md` - Design consistency rules
 
-### Justification for New Files:
-- **No duplicate functionality found** - These are new specialized components for vehicle analytics
-- **Follows existing patterns** - Uses same design system and component structure as dashboard
-- **Leverages existing infrastructure** - Reuses API client, SSE hooks, and UI components
-- **Provides unique value** - Offers comprehensive vehicle analysis not available elsewhere
+3. **Related Components**: Examined dependencies
+   - `src/lib/api-client.ts` - TanStack Query hooks
+   - `src/types/sse-events.ts` - SSE event types
+   - `src/hooks/use-server-sent-events.ts` - SSE hook implementation
+   - `src/components/ui/chart.tsx` - Shadcn chart components
 
-### Features Implemented:
-- Real-time vehicle detection with SSE integration
-- Interactive charts using Recharts with shadcn chart wrapper
-- Comprehensive filtering and search capabilities
-- Vehicle classification and status analysis
-- Detailed specifications reference
-- Responsive design with animations
-- Error handling and loading states
+### Issues Identified:
+1. **SSE Integration Problems**:
+   - Components not properly handling generic 'message' event types
+   - Missing connection status indicators
+   - No pause/resume functionality for streams
+   - Hardcoded URLs instead of environment variables
 
-All components follow the established design philosophy and use existing infrastructure where possible. 
+2. **Design Inconsistencies**:
+   - Hardcoded colors instead of semantic tokens (e.g., `#3b82f6` instead of `hsl(var(--chart-1))`)
+   - Inconsistent animation usage
+   - Missing loading states with Skeleton components
+   - Not following the established animation patterns
+
+3. **API Integration Issues**:
+   - Mock data mixed with real API calls
+   - Missing proper error handling
+   - No proper data merging between API and SSE data
+   - Incorrect chart implementations
+
+4. **Visual Appeal**:
+   - Charts not using shadcn patterns properly
+   - Missing connection status badges
+   - Inconsistent spacing and typography
+   - No real-time visual feedback
+
+### Refactoring Plan:
+
+#### 1. VehicleStatsDashboard Component
+- **SSE Integration**: Add proper event detection for both 'VEHICLE' and 'message' types
+- **Semantic Colors**: Replace all hardcoded colors with CSS variables
+- **Chart Fixes**: Implement proper shadcn ChartContainer, ChartTooltip, ChartTooltipContent
+- **Loading States**: Add Skeleton components for all data sections
+- **Real-time Updates**: Merge SSE data with API data for live updates
+- **Connection Status**: Add visual indicators for SSE connection
+
+#### 2. LiveVehicleLog Component  
+- **SSE URL Fix**: Use environment variables with fallback
+- **Event Detection**: Handle both typed and generic events
+- **Visual Enhancement**: Add ConnectionBadge component
+- **Table Animation**: Implement row animations for new entries
+- **Filtering System**: Add comprehensive filters (class, status, intersection, direction)
+- **Pause/Resume**: Add stream control functionality
+
+#### 3. StatusAnomalyChart Component
+- **SSE Integration**: Add real-time anomaly detection
+- **Semantic Colors**: Use destructive, warning, success tokens
+- **Chart Implementation**: Add proper shadcn chart patterns
+- **Real-time Trend**: Add historical anomaly visualization
+- **System Health**: Live connection indicators
+
+#### 4. VehicleSpecsReference Component
+- **Animation**: Use AnimatedList for smooth rendering
+- **Color System**: Replace hardcoded colors with semantic tokens
+- **Loading State**: Add proper skeleton loading
+- **Collapsible Enhancement**: Smooth transitions with animations
+- **API Integration**: Connect to real specifications endpoint
+
+### Dependencies:
+- All existing UI components from shadcn
+- TanStack Query for data fetching
+- SSE hooks for real-time data
+- Animation utilities from globals.css
+- Type definitions from api.ts and sse-events.ts
+
+### No New Files Required:
+All functionality will be implemented by refactoring existing components. No new components or utilities need to be created.
 
 # New File Requests Documentation
 
@@ -351,4 +407,319 @@ All components follow the established design philosophy:
 2. **Historical Trends**: Add time-series analysis for vehicle patterns
 3. **Export Functionality**: Add data export capabilities for reports
 4. **Advanced Filtering**: Implement more sophisticated filtering options
-5. **Performance Optimization**: Implement virtualization for large datasets 
+5. **Performance Optimization**: Implement virtualization for large datasets
+
+## Analytics Page Implementation
+
+### Files Created for Analytics Page:
+
+#### 1. `src/app/analytics/page.tsx`
+**Purpose**: Main analytics page with comprehensive risk analysis and intelligence features
+**Justification**: Required for the analytics section as specified in COMPONENTS_AND_PAGES.md
+**Search for Duplicates**: No existing analytics page found in the codebase
+**Features**: 
+- Tabbed interface for Risk Analysis, Historical Performance, and Incidents & Congestion
+- Responsive grid layout for components
+- Proper page header with BarChart3 icon
+- Integration with risk analysis components
+
+#### 2. `src/components/analytics/intersection-risk-profiler.tsx`
+**Purpose**: Interactive risk profiler for intersection-specific safety analysis
+**Justification**: Core component for risk analysis tab as specified in COMPONENTS_AND_PAGES.md
+**Search for Duplicates**: No existing intersection risk profiler component found
+**API Integration**: Uses `/api/risk/analysis` endpoint with intersection filtering
+**Features**:
+- Intersection selector dropdown with search functionality
+- Risk score gauge chart using RadialBarChart from Recharts
+- Risk breakdown radar chart showing traffic, intersection, environment, and incident factors
+- Real-time risk level badges with semantic colors
+- Priority action recommendations display
+- Live update timestamps
+
+#### 3. `src/components/analytics/top-risk-factors.tsx`
+**Purpose**: Prioritized list of risk factors contributing to overall safety assessment
+**Justification**: Core component for risk analysis tab as specified in COMPONENTS_AND_PAGES.md
+**Search for Duplicates**: No existing risk factors component found
+**API Integration**: Uses same `/api/risk/analysis` endpoint for risk factors data
+**Features**:
+- Categorized risk factor summary with critical/high severity counts
+- Ranked list of risk factors sorted by severity
+- Visual severity indicators with semantic colors and icons
+- Progress bars for impact level visualization
+- Category-based icons (Car, MapPin, Cloud, Shield)
+- Scrollable list with proper spacing and separators
+- Real-time updates with timestamp display
+
+### API Integration Updates:
+
+#### Updated `src/lib/api-client.ts`
+**Changes Made**:
+- Enhanced `useRiskAnalysis` hook to accept intersection_id parameter
+- Added proper query parameter handling for filtering
+- Added RiskAnalysisResponse import for type safety
+
+#### Updated `src/types/api.ts`
+**Changes Made**:
+- Added complete `RiskAnalysisResponse` interface matching API response structure
+- Added `RiskFactor` interface for individual risk factors
+- Added `Recommendation` interface for priority actions
+- Proper TypeScript support for all risk analysis data structures
+
+### API Response Structure Handled:
+```json
+{
+  "risk_analysis": {
+    "overall_risk": {
+      "score": 31.1,
+      "level": "low",
+      "timestamp": "2025-06-22T16:09:03.988Z"
+    },
+    "risk_breakdown": {
+      "traffic": 9.1,
+      "intersection": 22,
+      "environment": 0,
+      "incidents": 0
+    },
+    "risk_factors": [
+      {
+        "category": "traffic",
+        "factor": "medium_density",
+        "severity": "medium",
+        "value": 67,
+        "description": "Medium traffic density (67) requires caution"
+      }
+      // ... more factors
+    ],
+    "total_factors": 7
+  },
+  "current_conditions": {...},
+  "recommendations": [...],
+  "metadata": {...}
+}
+```
+
+### Component Features:
+
+#### Intersection Risk Profiler
+- **Intersection Selection**: Reuses existing IntersectionSelector component
+- **Risk Score Gauge**: RadialBar chart with dynamic colors based on risk level
+- **Risk Breakdown Radar**: PolarGrid radar chart showing 4 risk categories
+- **Risk Level Display**: Semantic color badges (critical/high/medium/low)
+- **Priority Actions**: Alert component showing critical recommendations
+- **Real-time Updates**: Live timestamps and connection status
+- **Error Handling**: Proper error states with retry functionality
+- **Loading States**: Skeleton components during data fetching
+
+#### Top Risk Factors
+- **Category Summary**: Grid showing factor counts by category with badges
+- **Prioritized List**: Ranked factors sorted by severity and category
+- **Visual Indicators**: Icons, badges, and progress bars for each factor
+- **Severity Mapping**: Color-coded severity levels with proper semantic colors
+- **Factor Details**: Descriptive text and impact values for each factor
+- **Scrollable Interface**: Fixed height with proper scroll area
+- **Responsive Design**: Adapts to different screen sizes
+
+### Design Adherence:
+
+All components follow established design principles:
+- **Semantic Colors**: Uses CSS variables instead of hardcoded colors
+- **Consistent Icons**: Lucide React icons with proper sizing
+- **Animation**: Fade-in-up animations and smooth transitions
+- **Typography**: Proper font weights and hierarchy
+- **Spacing**: Consistent spacing using Tailwind classes
+- **Responsive**: Mobile-first design approach
+- **Accessibility**: Proper ARIA labels and semantic HTML
+- **Loading States**: Skeleton components for better UX
+- **Error Handling**: User-friendly error messages with retry options
+
+### Future Enhancements:
+
+1. **Historical Performance Tab**: Multi-metric traffic charts and weather impact analysis
+2. **Incidents & Congestion Tab**: Congestion hotspots and incident pattern analysis
+3. **Risk Heatmap Integration**: Geographic visualization of risk scores
+4. **Real-time SSE Updates**: Live risk factor updates via Server-Sent Events
+5. **Export Functionality**: Risk assessment reports and data export
+6. **Alert Integration**: Connect with alert system for automated notifications
+7. **Trend Analysis**: Historical risk pattern analysis and predictions
+
+### Navigation Integration:
+
+The Analytics page is already integrated into the sidebar navigation as confirmed by existing entry in `src/components/dashboard/sidebar.tsx`:
+```typescript
+{
+  title: 'Analytics',
+  url: '/analytics',
+  icon: BarChart3,
+  description: 'Advanced traffic analytics',
+}
+```
+
+### Implementation Quality:
+
+✅ **API Integration**: Properly connected to `/api/risk/analysis` endpoint
+✅ **Type Safety**: Full TypeScript support with proper interfaces
+✅ **Error Handling**: Comprehensive error states and retry mechanisms
+✅ **Loading States**: Skeleton components for better user experience
+✅ **Responsive Design**: Works across all screen sizes
+✅ **Visual Polish**: Semantic colors, proper spacing, and animations
+✅ **Real-time Updates**: Live data with timestamp display
+✅ **Component Reuse**: Leverages existing IntersectionSelector component
+✅ **Design Consistency**: Follows established design philosophy
+
+## Risk Heatmap Implementation
+
+### Files Created for Risk Heatmap Tab:
+
+#### 1. `src/components/analytics/congestion-hotspot-heatmap.tsx`
+**Purpose**: Interactive congestion heatmap showing day/hour patterns for traffic planning optimization
+**Justification**: Replaces Historical Performance tab with more valuable congestion analysis as requested
+**Search for Duplicates**: No existing congestion heatmap component found
+**API Integration**: Uses `/api/historical/congestion` endpoint
+**Features**:
+- Weekly 7×24 hour grid visualization with color-coded congestion levels
+- Interactive tooltips showing detailed congestion data for each time slot
+- Summary statistics (average congestion, peak congestion, peak hours)
+- Responsive design with horizontal scroll for mobile
+- Color-coded legend (Clear → Light → Moderate → Heavy → Severe → Critical)
+- Proper handling of zero-value data with informative alerts
+- Insights panel with peak period analysis and usage recommendations
+
+### Updated Components:
+
+#### Updated `src/app/analytics/page.tsx`
+**Changes Made**:
+- Replaced "Historical Performance" tab with "Risk Heatmap" tab
+- Added imports for RiskHeatmap and CongestionHotspotHeatmap components
+- Updated tab structure to show Geographic Risk Distribution and Congestion Hotspot Analysis
+- Added proper semantic badges and icons (MapPin, Calendar, Activity, BarChart3)
+- Responsive grid layout for both components
+
+#### Updated `src/types/api.ts`
+**Changes Made**:
+- Added `RiskHeatmapResponse` interface matching `/api/risk/heatmap` response structure
+- Added `RiskHeatmapLocation` interface for individual location data
+- Added `CongestionHeatmapData` interface for `/api/historical/congestion` response
+- Complete type safety for both new API endpoints
+
+#### Updated `src/lib/api-client.ts`
+**Changes Made**:
+- Enhanced `useRiskHeatmap` hook with parameter support for filtering
+- Added proper TypeScript return type for risk heatmap data
+- Enhanced `useHistoricalCongestion` hook with proper return type
+- Added imports for new response interfaces
+
+### API Response Structures Handled:
+
+#### Risk Heatmap API (`/api/risk/heatmap`):
+```json
+{
+  "heatmap_data": [
+    {
+      "location": {
+        "intersection_id": "hassan-ii-bd-moulay-youssef",
+        "sensor_id": "sensor-005",
+        "coordinates": { "lat": -7.6142, "lng": 33.6045 }
+      },
+      "risk_score": 39.3,
+      "risk_level": "low",
+      "risk_breakdown": {
+        "traffic": 25.55,
+        "intersection": 13.75,
+        "environment": 0,
+        "incidents": 0
+      },
+      "stats": {
+        "traffic": { "avg_speed": 45.4, "avg_density": 50.1, "incident_count": 5 },
+        "intersection": { "avg_wait_time": 45.5, "total_collisions": 5 },
+        "alerts": { "alert_count": 15, "high_severity_count": 0 }
+      }
+    }
+  ],
+  "summary": {
+    "total_locations": 8,
+    "risk_distribution": { "critical": 0, "high": 0, "medium": 0, "low": 8 },
+    "average_risk_score": 23.3
+  }
+}
+```
+
+#### Congestion Heatmap API (`/api/historical/congestion`):
+```json
+[
+  {
+    "id": "Sunday",
+    "data": [
+      { "x": "0", "y": 0 },
+      { "x": "1", "y": 0 },
+      // ... 24 hours
+    ]
+  }
+  // ... 7 days
+]
+```
+
+### Component Features:
+
+#### Risk Heatmap Component (Existing)
+- **Summary Statistics**: Total locations, average risk score, high risk sites, low risk sites
+- **Search & Filtering**: Search by intersection/sensor/location ID, filter by risk level
+- **Risk Distribution**: Visual progress bars showing risk level distribution
+- **Location Cards**: Detailed cards for each location with risk scores, breakdowns, and statistics
+- **Real-time Updates**: Live timestamps and data refresh
+- **Responsive Design**: Grid layout adapts to screen size
+- **Error Handling**: Comprehensive error states with retry functionality
+
+#### Congestion Hotspot Heatmap Component (New)
+- **Weekly Grid**: 7 days × 24 hours interactive heatmap
+- **Color Coding**: Six-level color scale from Clear to Critical congestion
+- **Interactive Tooltips**: Hover details for each time slot
+- **Summary Statistics**: Average congestion, peak congestion, peak hours
+- **Responsive Layout**: Horizontal scroll on mobile, full grid on desktop
+- **Zero-Data Handling**: Proper messaging for empty datasets
+- **Insights Panel**: Peak period analysis and traffic recommendations
+- **Legend**: Clear color scale explanation
+
+### Design Adherence:
+
+All components follow established design principles:
+- **Semantic Colors**: Uses CSS variables and design tokens
+- **Consistent Icons**: Lucide React icons with proper sizing and semantic meaning
+- **Animation**: Smooth hover effects and transitions
+- **Typography**: Proper font hierarchy and weights
+- **Spacing**: Consistent Tailwind spacing classes (space-y-6, gap-4, etc.)
+- **Responsive**: Mobile-first design with proper breakpoints
+- **Accessibility**: Proper ARIA labels, semantic HTML, and focus management
+- **Loading States**: Skeleton components for better UX
+- **Error Handling**: User-friendly error messages with retry options
+- **Tooltips**: Enhanced UX with contextual information
+
+### Implementation Quality:
+
+✅ **API Integration**: Properly connected to both risk heatmap and congestion endpoints
+✅ **Type Safety**: Complete TypeScript interfaces for all data structures  
+✅ **Error Handling**: Comprehensive error states and retry mechanisms
+✅ **Loading States**: Skeleton components for smooth loading experience
+✅ **Responsive Design**: Works seamlessly across all screen sizes
+✅ **Visual Polish**: Semantic colors, proper spacing, and smooth animations
+✅ **Real-time Updates**: Live data with proper refresh intervals
+✅ **Interactive Features**: Search, filtering, tooltips, and hover effects
+✅ **Design Consistency**: Follows all established design philosophy guidelines
+✅ **Performance**: Optimized rendering with useMemo for data processing
+✅ **Accessibility**: Proper semantic HTML and ARIA support
+
+### Future Enhancements:
+
+1. **Geographic Map Integration**: Add actual map visualization for risk heatmap locations
+2. **Real-time Congestion**: Integrate live congestion data via SSE
+3. **Export Functionality**: Allow data export for reports and analysis
+4. **Advanced Filtering**: Time-based filtering for congestion patterns
+5. **Predictive Analytics**: Add congestion forecasting capabilities
+6. **Alert Integration**: Connect congestion patterns with alert system
+7. **Historical Comparison**: Compare congestion patterns across different time periods
+
+### Tab Structure Update:
+
+The Analytics page now has three tabs:
+1. **Risk Analysis** - Intersection Risk Profiler and Top Risk Factors (existing)
+2. **Risk Heatmap** - Geographic Risk Distribution and Congestion Hotspot Analysis (new)
+3. **Incidents & Congestion** - Placeholder for future incident analysis (existing) 
